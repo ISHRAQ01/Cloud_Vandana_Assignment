@@ -28,6 +28,9 @@ import {
   UserCheck
 } from 'lucide-react';
 
+// Set API URL from environment variable or default to localhost for development
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 axios.defaults.withCredentials = true;
 
 function App() {
@@ -49,7 +52,7 @@ function App() {
 
   const handleLogin = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/auth/login');
+      const res = await axios.get(`${API_URL}/auth/login`);
       window.location.href = res.data.url;
     } catch (error) {
       showAlert('Login failed: ' + error.message, 'error');
@@ -57,7 +60,11 @@ function App() {
   };
 
   const handleLogout = async () => {
-    await axios.get('http://localhost:3001/auth/logout');
+    try {
+      await axios.get(`${API_URL}/auth/logout`);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
     setIsLoggedIn(false);
     setRules([]);
     setUser(null);
@@ -68,7 +75,7 @@ function App() {
   const fetchMetadata = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:3001/api/validation-rules');
+      const res = await axios.get(`${API_URL}/api/validation-rules`);
       setRules(res.data);
       showAlert(`✨ Successfully fetched ${res.data.length} validation rules`, 'success');
     } catch (error) {
@@ -84,8 +91,8 @@ function App() {
 
   const fetchUserInfo = async () => {
     try {
-      console.log('Fetching user info...');
-      const res = await axios.get('http://localhost:3001/api/user/info');
+      console.log('Fetching user info from:', `${API_URL}/api/user/info`);
+      const res = await axios.get(`${API_URL}/api/user/info`);
       console.log('User info response:', res.data);
       
       if (res.data && res.data.user) {
@@ -115,7 +122,7 @@ function App() {
   const toggleRule = async (ruleName, currentStatus) => {
     setDeploying(true);
     try {
-      await axios.post('http://localhost:3001/api/update-rule', {
+      await axios.post(`${API_URL}/api/update-rule`, {
         ruleName,
         active: !currentStatus
       });
@@ -131,7 +138,7 @@ function App() {
     setDeploying(true);
     for (let rule of rules) {
       try {
-        await axios.post('http://localhost:3001/api/update-rule', {
+        await axios.post(`${API_URL}/api/update-rule`, {
           ruleName: rule.name,
           active: true
         });
@@ -148,7 +155,7 @@ function App() {
     setDeploying(true);
     for (let rule of rules) {
       try {
-        await axios.post('http://localhost:3001/api/update-rule', {
+        await axios.post(`${API_URL}/api/update-rule`, {
           ruleName: rule.name,
           active: false
         });
@@ -217,11 +224,7 @@ function App() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => setEnvironment('production')}
-                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                      environment === 'production'
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                        : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                    }`}
+                    className="w-full py-3 rounded-xl font-semibold transition-all duration-300 bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg"
                   >
                     Production
                   </button>
@@ -301,7 +304,7 @@ function App() {
             </div>
             <div>
               <h3 className="font-bold text-white text-lg">Salesforce Switch</h3>
-              <p className="text-xs text-gray-400">Enterprise Edition v2.0</p>
+              <p className="text-xs text-gray-400">Enterprise Edition</p>
             </div>
           </div>
         </div>
@@ -319,7 +322,7 @@ function App() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">Environment</p>
             <div className="px-3 py-3 flex items-center gap-3 bg-white/5 rounded-xl">
               <Cloud size={18} className="text-purple-400" />
-              <span className="font-medium text-gray-300">{environment === 'production' ? 'Production' : 'Sandbox'}</span>
+              <span className="font-medium text-gray-300">Production</span>
             </div>
           </div>
 
@@ -340,10 +343,10 @@ function App() {
               <User size={18} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white text-sm truncate">{user?.name || 'Loading...'}</p>
+              <p className="font-semibold text-white text-sm truncate">{user?.name || 'Salesforce User'}</p>
               <p className="text-xs text-gray-400 truncate flex items-center gap-1">
                 <Mail size={10} />
-                {user?.email || 'Loading...'}
+                {user?.email || 'Connected'}
               </p>
             </div>
           </div>
@@ -374,7 +377,7 @@ function App() {
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-semibold text-gray-800">{user?.name || 'Salesforce User'}</p>
-                  <p className="text-xs text-gray-500">{user?.email || 'Connected to Salesforce'}</p>
+                  <p className="text-xs text-gray-500">{user?.email || 'Connected'}</p>
                 </div>
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-md relative">
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full blur-sm opacity-50"></div>
