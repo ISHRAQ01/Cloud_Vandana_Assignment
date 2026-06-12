@@ -24,6 +24,7 @@ app.use(session({
 
 let globalAccessToken = null;
 let globalInstanceUrl = null;
+let cachedRules = [];
 
 app.get('/auth/login', (req, res) => {
   const redirectUri = 'http://localhost:3001/oauth/callback';
@@ -80,7 +81,6 @@ app.get('/oauth/callback', async (req, res) => {
   }
 });
 
-// Get validation rules
 app.get('/api/validation-rules', async (req, res) => {
   const token = req.session?.accessToken || globalAccessToken;
   const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
@@ -90,26 +90,44 @@ app.get('/api/validation-rules', async (req, res) => {
   }
   
   try {
-    // Simple query without DeveloperName
-    const query = encodeURIComponent("SELECT Id, FullName, Metadata FROM ValidationRule");
-    const response = await fetch(`${instanceUrl}/services/data/v58.0/tooling/query?q=${query}`, {
+    const idQuery = encodeURIComponent("SELECT Id FROM ValidationRule");
+    const idResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/query?q=${idQuery}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     
-    const data = await response.json();
+    const idData = await idResponse.json();
     
-    if (data.records && data.records.length > 0) {
-      const rules = data.records.map(rule => ({
-        id: rule.Id,
-        name: rule.FullName,
-        active: rule.Metadata?.active || false
-      }));
-      console.log(`✅ Found ${rules.length} rules from Salesforce`);
-      return res.json(rules);
+    if (!idData.records || idData.records.length === 0) {
+      return res.json([]);
     }
     
-    console.log('No rules found, returning empty array');
-    res.json([]);
+    const rules = [];
+    for (const record of idData.records) {
+      const ruleResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${record.Id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const ruleData = await ruleResponse.json();
+      
+      let cleanName = ruleData.FullName;
+      if (cleanName.includes('.')) {
+        cleanName = cleanName.split('.').pop();
+      }
+      
+      rules.push({
+        id: ruleData.Id,
+        name: cleanName,
+        fullName: ruleData.FullName,
+        active: ruleData.Metadata?.active || false
+      });
+    }
+    
+    cachedRules = rules;
+    
+    console.log(`✅ Retrieved ${rules.length} rules`);
+    rules.forEach(r => console.log(`  - ${r.name}: ${r.active ? 'Active' : 'Inactive'}`));
+    
+    res.json(rules);
     
   } catch (error) {
     console.error('Error:', error.message);
@@ -117,59 +135,57 @@ app.get('/api/validation-rules', async (req, res) => {
   }
 });
 
-// Update validation rule - FIXED VERSION
 app.post('/api/update-rule', async (req, res) => {
   const { ruleName, active } = req.body;
   const token = req.session?.accessToken || globalAccessToken;
   const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
   
-  console.log(`📝 Updating rule: "${ruleName}" to ${active ? 'Active' : 'Inactive'}`);
+  console.log(`📝 Updating "${ruleName}" to ${active ? 'Active' : 'Inactive'}`);
   
   if (!token) {
     return res.status(401).json({ error: 'Not logged in' });
   }
   
   try {
-    // First, get all rules to find the matching one
-    const query = encodeURIComponent("SELECT Id, FullName FROM ValidationRule");
-    const response = await fetch(`${instanceUrl}/services/data/v58.0/tooling/query?q=${query}`, {
+    const rule = cachedRules.find(r => r.name === ruleName);
+    
+    if (!rule) {
+      console.log(`❌ Rule "${ruleName}" not found`);
+      return res.json({ success: false });
+    }
+    
+    console.log(`Found rule: ${rule.fullName} (ID: ${rule.id})`);
+    
+    // Get current rule data
+    const getResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.id}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     
-    const data = await response.json();
+    const ruleData = await getResponse.json();
+    const currentMetadata = ruleData.Metadata || {};
     
-    if (!data.records || data.records.length === 0) {
-      console.log('No rules found in org');
-      return res.json({ success: false });
-    }
+    // Prepare update with all required fields
+    const updateMetadata = {
+      active: active,
+      errorConditionFormula: currentMetadata.errorConditionFormula || 'true',
+      errorMessage: currentMetadata.errorMessage || 'Validation Error',
+      description: currentMetadata.description || ''
+    };
     
-    // Find the rule that matches (case insensitive)
-    const rule = data.records.find(r => 
-      r.FullName.toLowerCase() === ruleName.toLowerCase() ||
-      r.FullName.replace(/_/g, ' ').toLowerCase() === ruleName.toLowerCase()
-    );
-    
-    if (!rule) {
-      console.log(`❌ Rule "${ruleName}" not found. Available rules:`, data.records.map(r => r.FullName));
-      return res.json({ success: false });
-    }
-    
-    console.log(`Found rule: ${rule.FullName} (ID: ${rule.Id})`);
-    
-    // Update the rule
-    const updateResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.Id}`, {
+    const updateResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.id}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        Metadata: { active: active }
+        Metadata: updateMetadata
       })
     });
     
     if (updateResponse.ok) {
-      console.log(`✅ Successfully updated ${rule.FullName} to ${active ? 'Active' : 'Inactive'}`);
+      console.log(`✅ Successfully updated "${ruleName}"`);
+      rule.active = active;
       res.json({ success: true });
     } else {
       const errorText = await updateResponse.text();
@@ -192,6 +208,7 @@ app.get('/auth/logout', (req, res) => {
   req.session.destroy();
   globalAccessToken = null;
   globalInstanceUrl = null;
+  cachedRules = [];
   res.json({ success: true });
 });
 
