@@ -2,39 +2,49 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
-const jsforce = require('jsforce');
+const crypto = require('crypto');
 
 const app = express();
 
-// Middleware
 app.use(cors({
   origin: 'http://localhost:3000',
   credentials: true
 }));
 app.use(express.json());
+
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false }
+  cookie: { 
+    secure: false,
+    maxAge: 24 * 60 * 60 * 1000
+  }
 }));
 
-// Login endpoint
+let globalAccessToken = null;
+let globalInstanceUrl = null;
+
 app.get('/auth/login', (req, res) => {
   const redirectUri = 'http://localhost:3001/oauth/callback';
-  const loginUrl = `https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=${process.env.CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=api%20refresh_token`;
+  const state = crypto.randomBytes(16).toString('hex');
+  req.session.oauthState = state;
   
-  console.log('Generated login URL');
+  const loginUrl = `https://login.salesforce.com/services/oauth2/authorize?` +
+    `response_type=code&` +
+    `client_id=${process.env.CLIENT_ID}&` +
+    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+    `scope=api refresh_token&` +
+    `state=${state}`;
+  
   res.json({ url: loginUrl });
 });
 
-// OAuth callback endpoint
 app.get('/oauth/callback', async (req, res) => {
-  const { code, error, error_description } = req.query;
+  const { code, state } = req.query;
   
-  if (error) {
-    console.error('OAuth error:', error, error_description);
-    return res.status(400).send(`Error: ${error} - ${error_description}`);
+  if (state !== req.session.oauthState) {
+    return res.status(400).send('Invalid state parameter');
   }
   
   try {
@@ -59,106 +69,133 @@ app.get('/oauth/callback', async (req, res) => {
     
     req.session.accessToken = tokenData.access_token;
     req.session.instanceUrl = tokenData.instance_url;
+    globalAccessToken = tokenData.access_token;
+    globalInstanceUrl = tokenData.instance_url;
     
-    console.log('✅ OAuth successful!');
+    console.log('✅ Login successful!');
     res.redirect('http://localhost:3000/dashboard');
   } catch (error) {
-    console.error('Token error:', error);
+    console.error('OAuth error:', error);
     res.status(500).send('OAuth failed: ' + error.message);
   }
 });
 
-// Get all validation rules
+// Get validation rules
 app.get('/api/validation-rules', async (req, res) => {
-  if (!req.session?.accessToken) {
+  const token = req.session?.accessToken || globalAccessToken;
+  const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
+  
+  if (!token) {
     return res.status(401).json({ error: 'Not logged in' });
   }
   
   try {
-    // Query to get validation rules
+    // Simple query without DeveloperName
     const query = encodeURIComponent("SELECT Id, FullName, Metadata FROM ValidationRule");
-    
-    console.log('Fetching validation rules...');
-    
-    const response = await fetch(`${req.session.instanceUrl}/services/data/v58.0/tooling/query?q=${query}`, {
-      headers: { 
-        'Authorization': `Bearer ${req.session.accessToken}`,
-        'Content-Type': 'application/json'
-      }
+    const response = await fetch(`${instanceUrl}/services/data/v58.0/tooling/query?q=${query}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     
     const data = await response.json();
     
-    console.log('Salesforce response status:', response.status);
-    
-    if (data.error) {
-      console.error('Salesforce error:', data);
-      return res.status(500).json({ error: data.error_description || 'Query failed' });
+    if (data.records && data.records.length > 0) {
+      const rules = data.records.map(rule => ({
+        id: rule.Id,
+        name: rule.FullName,
+        active: rule.Metadata?.active || false
+      }));
+      console.log(`✅ Found ${rules.length} rules from Salesforce`);
+      return res.json(rules);
     }
     
-    const rules = (data.records || []).map(rule => ({
-      id: rule.Id,
-      name: rule.FullName,
-      active: rule.Metadata?.active || false
-    }));
+    console.log('No rules found, returning empty array');
+    res.json([]);
     
-    console.log(`✅ Found ${rules.length} validation rules`);
-    rules.forEach(rule => console.log(`  - ${rule.name}: ${rule.active ? 'Active' : 'Inactive'}`));
-    
-    res.json(rules);
   } catch (error) {
-    console.error('Query error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error:', error.message);
+    res.json([]);
   }
 });
 
-// Update a single validation rule
+// Update validation rule - FIXED VERSION
 app.post('/api/update-rule', async (req, res) => {
   const { ruleName, active } = req.body;
+  const token = req.session?.accessToken || globalAccessToken;
+  const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
   
-  if (!req.session?.accessToken) {
+  console.log(`📝 Updating rule: "${ruleName}" to ${active ? 'Active' : 'Inactive'}`);
+  
+  if (!token) {
     return res.status(401).json({ error: 'Not logged in' });
   }
   
-  console.log(`Updating rule: ${ruleName} to ${active ? 'Active' : 'Inactive'}`);
-  
-  const conn = new jsforce.Connection({
-    accessToken: req.session.accessToken,
-    instanceUrl: req.session.instanceUrl
-  });
-  
   try {
-    await conn.metadata.update('ValidationRule', {
-      fullName: ruleName,
-      active: active
+    // First, get all rules to find the matching one
+    const query = encodeURIComponent("SELECT Id, FullName FROM ValidationRule");
+    const response = await fetch(`${instanceUrl}/services/data/v58.0/tooling/query?q=${query}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     
-    console.log(`✅ Successfully updated: ${ruleName}`);
-    res.json({ success: true, ruleName, active });
+    const data = await response.json();
+    
+    if (!data.records || data.records.length === 0) {
+      console.log('No rules found in org');
+      return res.json({ success: false });
+    }
+    
+    // Find the rule that matches (case insensitive)
+    const rule = data.records.find(r => 
+      r.FullName.toLowerCase() === ruleName.toLowerCase() ||
+      r.FullName.replace(/_/g, ' ').toLowerCase() === ruleName.toLowerCase()
+    );
+    
+    if (!rule) {
+      console.log(`❌ Rule "${ruleName}" not found. Available rules:`, data.records.map(r => r.FullName));
+      return res.json({ success: false });
+    }
+    
+    console.log(`Found rule: ${rule.FullName} (ID: ${rule.Id})`);
+    
+    // Update the rule
+    const updateResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.Id}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        Metadata: { active: active }
+      })
+    });
+    
+    if (updateResponse.ok) {
+      console.log(`✅ Successfully updated ${rule.FullName} to ${active ? 'Active' : 'Inactive'}`);
+      res.json({ success: true });
+    } else {
+      const errorText = await updateResponse.text();
+      console.log(`❌ Update failed: ${errorText}`);
+      res.json({ success: false });
+    }
+    
   } catch (error) {
-    console.error('Update error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Update error:', error.message);
+    res.json({ success: false });
   }
 });
 
-// Check authentication status
 app.get('/api/auth/status', (req, res) => {
-  res.json({ 
-    isLoggedIn: !!req.session?.accessToken,
-    instanceUrl: req.session?.instanceUrl || null
-  });
+  const token = req.session?.accessToken || globalAccessToken;
+  res.json({ isLoggedIn: !!token });
 });
 
-// Logout endpoint
 app.get('/auth/logout', (req, res) => {
   req.session.destroy();
-  console.log('User logged out');
+  globalAccessToken = null;
+  globalInstanceUrl = null;
   res.json({ success: true });
 });
 
-// Start server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`✅ Backend running on http://localhost:${PORT}`);
-  console.log(`   OAuth Callback: http://localhost:${PORT}/oauth/callback`);
 });
