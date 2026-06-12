@@ -214,6 +214,7 @@ app.post('/api/update-rule', async (req, res) => {
 
 // ==================== UTILITY ENDPOINTS ====================
 
+// Check authentication status
 app.get('/api/auth/status', (req, res) => {
   const token = req.session?.accessToken || globalAccessToken;
   res.json({ 
@@ -221,9 +222,12 @@ app.get('/api/auth/status', (req, res) => {
   });
 });
 
+// Get current user info from Salesforce (REAL USER DATA)
 app.get('/api/user/info', async (req, res) => {
   const token = req.session?.accessToken || globalAccessToken;
   const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
+  
+  console.log('\n👤 Fetching user info from Salesforce...');
   
   if (!token) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -233,22 +237,38 @@ app.get('/api/user/info', async (req, res) => {
     const response = await fetch(`${instanceUrl}/services/oauth2/userinfo`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
+    
     const userInfo = await response.json();
     
+    console.log(`✅ User info fetched: ${userInfo.name} (${userInfo.username})`);
+    
     res.json({
-      username: userInfo.username,
-      name: userInfo.name,
-      email: userInfo.email,
-      orgId: userInfo.organization_id
+      success: true,
+      user: {
+        username: userInfo.username,
+        name: userInfo.name,
+        email: userInfo.email,
+        userId: userInfo.user_id,
+        orgId: userInfo.organization_id,
+        orgName: userInfo.organization_name || 'Salesforce Org',
+        instanceUrl: instanceUrl
+      }
     });
   } catch (error) {
-    res.json({
-      username: 'Salesforce User',
-      email: 'user@salesforce.com'
+    console.error('❌ Error fetching user info:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      user: {
+        username: 'unknown@salesforce.com',
+        name: 'Salesforce User',
+        email: 'user@salesforce.com'
+      }
     });
   }
 });
 
+// Logout
 app.get('/auth/logout', (req, res) => {
   req.session.destroy();
   globalAccessToken = null;
@@ -258,6 +278,7 @@ app.get('/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
@@ -275,6 +296,7 @@ app.listen(PORT, () => {
   console.log('=====================================');
   console.log(`📡 Server: http://localhost:${PORT}`);
   console.log(`🔐 OAuth Login: http://localhost:${PORT}/auth/login`);
+  console.log(`👤 User Info: http://localhost:${PORT}/api/user/info`);
   console.log(`💚 Health: http://localhost:${PORT}/api/health`);
   console.log('=====================================\n');
 });

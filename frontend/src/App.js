@@ -12,7 +12,20 @@ import {
   Cloud,
   Activity,
   Bell,
-  User
+  User,
+  Zap,
+  Sparkles,
+  Menu,
+  X,
+  Loader2,
+  ArrowRight,
+  TrendingUp,
+  Clock,
+  Server,
+  Building2,
+  Mail,
+  Lock,
+  UserCheck
 } from 'lucide-react';
 
 axios.defaults.withCredentials = true;
@@ -23,15 +36,17 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [user, setUser] = useState(null);
+  const [userInfo, setUserInfo] = useState(null);
   const [environment, setEnvironment] = useState('production');
   const [alert, setAlert] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [hoveredRule, setHoveredRule] = useState(null);
 
   const showAlert = (message, type = 'success') => {
     setAlert({ message, type });
     setTimeout(() => setAlert(null), 4000);
   };
 
-  // OAuth Login
   const handleLogin = async () => {
     try {
       const res = await axios.get('http://localhost:3001/auth/login');
@@ -46,6 +61,7 @@ function App() {
     setIsLoggedIn(false);
     setRules([]);
     setUser(null);
+    setUserInfo(null);
     showAlert('Logged out successfully', 'success');
   };
 
@@ -54,7 +70,7 @@ function App() {
     try {
       const res = await axios.get('http://localhost:3001/api/validation-rules');
       setRules(res.data);
-      showAlert(`Successfully fetched ${res.data.length} validation rules`, 'success');
+      showAlert(`✨ Successfully fetched ${res.data.length} validation rules`, 'success');
     } catch (error) {
       if (error.response?.status === 401) {
         setIsLoggedIn(false);
@@ -66,6 +82,25 @@ function App() {
     setLoading(false);
   };
 
+  const fetchUserInfo = async () => {
+    try {
+      const res = await axios.get('http://localhost:3001/api/user/info');
+      if (res.data.success) {
+        setUserInfo(res.data.user);
+        setUser({
+          name: res.data.user.name,
+          email: res.data.user.email,
+          username: res.data.user.username,
+          orgName: res.data.user.orgName
+        });
+        console.log('✅ Real user info loaded:', res.data.user);
+      }
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      setUser({ name: 'Salesforce User', email: 'user@salesforce.com' });
+    }
+  };
+
   const toggleRule = async (ruleName, currentStatus) => {
     setDeploying(true);
     try {
@@ -74,221 +109,175 @@ function App() {
         active: !currentStatus
       });
       await fetchMetadata();
-      showAlert(`"${ruleName}" ${!currentStatus ? 'enabled' : 'disabled'} successfully`, 'success');
+      showAlert(`🎯 "${ruleName}" ${!currentStatus ? 'enabled' : 'disabled'}`, 'success');
     } catch (error) {
       showAlert('Error updating rule: ' + error.message, 'error');
     }
     setDeploying(false);
   };
 
-  const deployChanges = async (action, rulesToUpdate) => {
+  const enableAll = async () => {
     setDeploying(true);
-    for (let rule of rulesToUpdate) {
+    for (let rule of rules) {
       try {
         await axios.post('http://localhost:3001/api/update-rule', {
           ruleName: rule.name,
-          active: action === 'enable'
+          active: true
         });
       } catch (error) {
         console.error(`Failed to update ${rule.name}:`, error);
       }
     }
     await fetchMetadata();
-    showAlert(`Complete - All changes have been successfully deployed`, 'success');
+    showAlert(`🚀 All rules enabled successfully`, 'success');
     setDeploying(false);
   };
 
-  const enableAll = () => deployChanges('enable', rules);
-  const disableAll = () => deployChanges('disable', rules);
+  const disableAll = async () => {
+    setDeploying(true);
+    for (let rule of rules) {
+      try {
+        await axios.post('http://localhost:3001/api/update-rule', {
+          ruleName: rule.name,
+          active: false
+        });
+      } catch (error) {
+        console.error(`Failed to update ${rule.name}:`, error);
+      }
+    }
+    await fetchMetadata();
+    showAlert(`🔒 All rules disabled successfully`, 'success');
+    setDeploying(false);
+  };
 
   useEffect(() => {
     if (window.location.pathname === '/dashboard') {
       setIsLoggedIn(true);
+      fetchUserInfo();
       fetchMetadata();
       window.history.pushState({}, '', '/');
     }
   }, []);
 
-  // Styles
-  const styles = {
-    loginContainer: {
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    },
-    loginCard: {
-      background: 'rgba(255, 255, 255, 0.98)',
-      borderRadius: '24px',
-      padding: '48px',
-      width: '100%',
-      maxWidth: '480px',
-      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-    },
-    logoIcon: {
-      width: '64px',
-      height: '64px',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      borderRadius: '16px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      margin: '0 auto 24px',
-    },
-    button: {
-      width: '100%',
-      padding: '14px',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      color: 'white',
-      border: 'none',
-      borderRadius: '12px',
-      fontSize: '16px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'transform 0.2s',
-    },
-    dashboardContainer: {
-      minHeight: '100vh',
-      background: '#f7fafc',
-    },
-    sidebar: {
-      width: '280px',
-      background: 'white',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-      position: 'fixed',
-      left: 0,
-      top: 0,
-      bottom: 0,
-      zIndex: 40,
-    },
-    mainContent: {
-      marginLeft: '280px',
-      padding: '24px',
-    },
-    statCard: {
-      background: 'white',
-      borderRadius: '16px',
-      padding: '20px',
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-    },
-    ruleTable: {
-      background: 'white',
-      borderRadius: '16px',
-      overflow: 'hidden',
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-    },
-    badge: {
-      padding: '4px 12px',
-      borderRadius: '20px',
-      fontSize: '12px',
-      fontWeight: '600',
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '6px',
-    },
-  };
+  const totalRules = rules.length;
+  const activeRules = rules.filter(r => r.active).length;
+  const inactiveRules = totalRules - activeRules;
 
   if (!isLoggedIn) {
     return (
-      <div style={styles.loginContainer}>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          style={styles.loginCard}
-        >
-          <div style={styles.logoIcon}>
-            <Shield size={32} color="white" />
-          </div>
-          <h2 style={{ textAlign: 'center', fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>
-            Salesforce Switch
-          </h2>
-          <p style={{ textAlign: 'center', color: '#718096', marginBottom: '32px' }}>
-            Enterprise Validation Rule Manager
-          </p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?q=80&w=1974&auto=format')] bg-cover bg-center opacity-5"></div>
+        <div className="absolute top-20 -right-20 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+        <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-128 h-128 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-2000"></div>
 
-          {/* Environment Selector */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Environment</label>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={() => setEnvironment('production')}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  background: environment === 'production' ? '#667eea' : '#f1f5f9',
-                  color: environment === 'production' ? 'white' : '#475569',
-                  border: 'none',
-                  borderRadius: '10px',
-                  cursor: 'pointer'
-                }}
-              >
-                Production
-              </button>
-              <button
-                onClick={() => setEnvironment('sandbox')}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  background: environment === 'sandbox' ? '#667eea' : '#f1f5f9',
-                  color: environment === 'sandbox' ? 'white' : '#475569',
-                  border: 'none',
-                  borderRadius: '10px',
-                  cursor: 'pointer'
-                }}
-              >
-                Sandbox
-              </button>
-            </div>
-          </div>
-
-          {/* OAuth Info */}
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <p style={{ fontSize: '13px', color: '#718096' }}>
-              You will be redirected to Salesforce login page
-            </p>
-          </div>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleLogin}
-            disabled={loading}
-            style={styles.button}
+        <div className="relative min-h-screen flex items-center justify-center px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, type: 'spring' }}
+            className="max-w-md w-full"
           >
-            {loading ? 'Connecting...' : (
-              <>
-                <LogIn size={18} style={{ display: 'inline', marginRight: '8px' }} />
-                Login with OAuth
-              </>
-            )}
-          </motion.button>
+            <div className="backdrop-blur-2xl bg-white/5 rounded-3xl p-10 shadow-2xl border border-white/10">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.5, type: 'spring' }}
+                className="flex justify-center mb-8"
+              >
+                <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-2xl relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl blur-xl opacity-50"></div>
+                  <Shield size={48} className="text-white relative z-10" />
+                </div>
+              </motion.div>
 
-          <p style={{ textAlign: 'center', fontSize: '12px', color: '#a0aec0', marginTop: '24px' }}>
-            Secured by OAuth 2.0 Protocol & Salesforce APIs
-          </p>
-        </motion.div>
+              <h1 className="text-5xl font-bold text-center text-white mb-3 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+                Salesforce Switch
+              </h1>
+              <p className="text-center text-gray-300 mb-10">
+                Enterprise Validation Rule Manager
+              </p>
+
+              {/* Environment Selector */}
+              <div className="mb-8">
+                <label className="block text-gray-300 text-sm mb-3 font-medium">Select Environment</label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setEnvironment('production')}
+                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                      environment === 'production'
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                        : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                    }`}
+                  >
+                    Production
+                  </button>
+                  <button
+                    onClick={() => setEnvironment('sandbox')}
+                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                      environment === 'sandbox'
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                        : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                    }`}
+                  >
+                    Sandbox
+                  </button>
+                </div>
+              </div>
+
+              {/* Features Grid */}
+              <div className="grid grid-cols-3 gap-3 mb-8">
+                <div className="text-center">
+                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mx-auto mb-2">
+                    <Lock size={18} className="text-purple-400" />
+                  </div>
+                  <p className="text-xs text-gray-400">Secure OAuth</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mx-auto mb-2">
+                    <Zap size={18} className="text-purple-400" />
+                  </div>
+                  <p className="text-xs text-gray-400">Real-time Sync</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mx-auto mb-2">
+                    <Database size={18} className="text-purple-400" />
+                  </div>
+                  <p className="text-xs text-gray-400">Metadata API</p>
+                </div>
+              </div>
+
+              {/* Login Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleLogin}
+                className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-bold text-white text-lg flex items-center justify-center gap-2 shadow-lg hover:shadow-2xl transition-all duration-300 relative overflow-hidden group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <LogIn size={20} className="relative z-10" />
+                <span className="relative z-10">Login with OAuth</span>
+                <ArrowRight size={18} className="relative z-10 group-hover:translate-x-1 transition-transform" />
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
 
         {/* Alert Toast */}
         <AnimatePresence>
           {alert && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              style={{
-                position: 'fixed',
-                top: '20px',
-                right: '20px',
-                padding: '12px 20px',
-                borderRadius: '12px',
-                background: alert.type === 'success' ? '#48bb78' : '#f56565',
-                color: 'white',
-                zIndex: 1000
-              }}
+              initial={{ opacity: 0, x: 50, y: -20 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              exit={{ opacity: 0, x: 50 }}
+              className="fixed top-5 right-5 z-50"
             >
-              {alert.message}
+              <div className={`backdrop-blur-2xl rounded-2xl px-6 py-4 flex items-center gap-3 shadow-2xl border ${
+                alert.type === 'success' ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30'
+              } text-white`}>
+                {alert.type === 'success' ? <CheckCircle size={20} /> : <XCircle size={20} />}
+                <span className="text-sm font-medium">{alert.message}</span>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -298,253 +287,331 @@ function App() {
 
   // Dashboard
   return (
-    <div style={styles.dashboardContainer}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Sidebar */}
       <motion.aside
-        initial={{ x: -280 }}
-        animate={{ x: 0 }}
-        transition={{ duration: 0.3 }}
-        style={styles.sidebar}
+        initial={{ x: -300 }}
+        animate={{ x: sidebarOpen ? 0 : -300 }}
+        transition={{ duration: 0.3, type: 'spring' }}
+        className="fixed left-0 top-0 bottom-0 w-80 bg-gradient-to-b from-slate-900 to-slate-800 shadow-2xl z-40 overflow-y-auto"
       >
-        <div style={{ padding: '24px', borderBottom: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ ...styles.logoIcon, width: '40px', height: '40px' }}>
-              <Shield size={20} color="white" />
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl blur-md opacity-50"></div>
+              <Shield size={22} className="text-white relative z-10" />
             </div>
             <div>
-              <h3 style={{ fontWeight: 'bold' }}>Salesforce Switch</h3>
-              <p style={{ fontSize: '12px', color: '#718096' }}>Enterprise Edition</p>
+              <h3 className="font-bold text-white text-lg">Salesforce Switch</h3>
+              <p className="text-xs text-gray-400">Enterprise Edition v2.0</p>
             </div>
           </div>
         </div>
 
-        <nav style={{ padding: '24px' }}>
-          <div style={{ marginBottom: '32px' }}>
-            <p style={{ fontSize: '12px', color: '#a0aec0', marginBottom: '12px' }}>MAIN</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: '#f7fafc', borderRadius: '10px' }}>
+        <nav className="p-4">
+          <div className="mb-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">Main</p>
+            <div className="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg">
               <Database size={18} />
-              <span>Validation Rules</span>
+              <span className="font-medium">Validation Rules</span>
             </div>
           </div>
 
-          <div style={{ marginBottom: '32px' }}>
-            <p style={{ fontSize: '12px', color: '#a0aec0', marginBottom: '12px' }}>ENVIRONMENT</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px' }}>
-              <Cloud size={18} />
-              <span>{environment === 'production' ? 'Production' : 'Sandbox'}</span>
+          <div className="mb-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">Environment</p>
+            <div className="px-3 py-3 flex items-center gap-3 bg-white/5 rounded-xl">
+              <Cloud size={18} className="text-purple-400" />
+              <span className="font-medium text-gray-300">{environment === 'production' ? 'Production' : 'Sandbox'}</span>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">Organization</p>
+            <div className="px-3 py-3 flex items-center gap-3 bg-white/5 rounded-xl">
+              <Building2 size={18} className="text-purple-400" />
+              <span className="font-medium text-gray-300 text-sm truncate">
+                {userInfo?.orgName || userInfo?.orgId || 'Salesforce Org'}
+              </span>
             </div>
           </div>
         </nav>
 
-        <div style={{ position: 'absolute', bottom: '24px', left: '24px', right: '24px' }}>
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-slate-800/50 backdrop-blur-sm">
+          <div className="flex items-center gap-3 mb-3 p-2 rounded-xl bg-white/5">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-md">
+              <User size={18} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-white text-sm truncate">{user?.name || 'Loading...'}</p>
+              <p className="text-xs text-gray-400 truncate flex items-center gap-1">
+                <Mail size={10} />
+                {user?.email || 'Loading...'}
+              </p>
+            </div>
+          </div>
           <button
             onClick={handleLogout}
-            style={{ width: '100%', padding: '12px', background: '#f56565', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            className="w-full py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl text-white font-medium flex items-center justify-center gap-2 transition-all duration-300 shadow-lg"
           >
-            <LogOut size={18} />
+            <LogOut size={16} />
             Logout
           </button>
         </div>
       </motion.aside>
 
       {/* Main Content */}
-      <div style={styles.mainContent}>
+      <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-80' : 'ml-0'}`}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-          <div>
-            <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1a202c' }}>Validation Rules Manager</h1>
-            <p style={{ color: '#718096' }}>Manage Account object validation rules in real-time</p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Bell size={20} color="#718096" />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <User size={20} color="white" />
-              </div>
-              <div>
-                <p style={{ fontWeight: '500', fontSize: '14px' }}>{user?.name || user?.username || 'Salesforce User'}</p>
-                <p style={{ fontSize: '12px', color: '#718096' }}>{user?.email || 'Connected to Salesforce'}</p>
+        <header className="bg-white/80 backdrop-blur-md shadow-lg sticky top-0 z-30 border-b border-gray-100">
+          <div className="px-8 py-4 flex justify-between items-center">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-gray-100 rounded-xl transition-all"
+            >
+              {sidebarOpen ? <X size={20} className="text-gray-600" /> : <Menu size={20} className="text-gray-600" />}
+            </button>
+            <div className="flex items-center gap-4">
+              <button className="p-2 hover:bg-gray-100 rounded-xl relative transition-all">
+                <Bell size={20} className="text-gray-600" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></span>
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold text-gray-800">{user?.name || 'Salesforce User'}</p>
+                  <p className="text-xs text-gray-500">{user?.email || 'Connected to Salesforce'}</p>
+                </div>
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-md relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full blur-sm opacity-50"></div>
+                  <UserCheck size={18} className="text-white relative z-10" />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Stats Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
-          <div style={styles.statCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ color: '#718096', fontSize: '14px' }}>Total Rules</p>
-                <p style={{ fontSize: '32px', fontWeight: 'bold' }}>{rules.length}</p>
-              </div>
-              <div style={{ width: '48px', height: '48px', background: '#ebf4ff', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Database size={24} color="#667eea" />
-              </div>
-            </div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ color: '#718096', fontSize: '14px' }}>Active Rules</p>
-                <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#48bb78' }}>{rules.filter(r => r.active).length}</p>
-              </div>
-              <div style={{ width: '48px', height: '48px', background: '#f0fff4', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle size={24} color="#48bb78" />
-              </div>
-            </div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ color: '#718096', fontSize: '14px' }}>Inactive Rules</p>
-                <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#f56565' }}>{rules.filter(r => !r.active).length}</p>
-              </div>
-              <div style={{ width: '48px', height: '48px', background: '#fff5f5', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <XCircle size={24} color="#f56565" />
-              </div>
-            </div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ color: '#718096', fontSize: '14px' }}>Sync Status</p>
-                <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#4299e1' }}>Live</p>
-              </div>
-              <div style={{ width: '48px', height: '48px', background: '#ebf8ff', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Activity size={24} color="#4299e1" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={fetchMetadata}
-            disabled={loading}
-            style={{ padding: '12px 24px', background: '#4299e1', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}
-          >
-            <RefreshCw size={18} />
-            {loading ? 'Fetching...' : 'Get Me Metadata'}
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={enableAll}
-            disabled={deploying}
-            style={{ padding: '12px 24px', background: '#48bb78', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}
-          >
-            <CheckCircle size={18} />
-            Enable All
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={disableAll}
-            disabled={deploying}
-            style={{ padding: '12px 24px', background: '#f56565', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}
-          >
-            <XCircle size={18} />
-            Disable All
-          </motion.button>
-        </div>
-
-        {/* Loaders */}
-        {(loading || deploying) && (
-          <div style={{ textAlign: 'center', padding: '60px' }}>
+        <main className="p-8">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-              style={{ width: '48px', height: '48px', border: '4px solid #e2e8f0', borderTop: '4px solid #667eea', borderRadius: '50%', margin: '0 auto 16px' }}
-            />
-            <p>{loading ? 'Querying metadata from Salesforce...' : 'Deploying changes to Salesforce...'}</p>
-          </div>
-        )}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-100"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Total Rules</p>
+                  <p className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mt-2">{totalRules}</p>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center">
+                  <Database size={28} className="text-purple-600" />
+                </div>
+              </div>
+              <div className="mt-4 flex items-center gap-2 text-sm">
+                <TrendingUp size={14} className="text-green-500" />
+                <span className="text-gray-600">Managed in real-time</span>
+              </div>
+            </motion.div>
 
-        {/* Rules Table */}
-        {!loading && !deploying && rules.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-100"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Active Rules</p>
+                  <p className="text-4xl font-bold text-green-600 mt-2">{activeRules}</p>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center">
+                  <CheckCircle size={28} className="text-green-600" />
+                </div>
+              </div>
+              <div className="mt-4 flex items-center gap-2 text-sm">
+                <Activity size={14} className="text-green-500" />
+                <span className="text-gray-600">Actively enforced</span>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-100"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Inactive Rules</p>
+                  <p className="text-4xl font-bold text-red-600 mt-2">{inactiveRules}</p>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-br from-red-100 to-orange-100 rounded-2xl flex items-center justify-center">
+                  <XCircle size={28} className="text-red-600" />
+                </div>
+              </div>
+              <div className="mt-4 flex items-center gap-2 text-sm">
+                <Clock size={14} className="text-red-500" />
+                <span className="text-gray-600">Currently disabled</span>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl p-6 shadow-xl relative overflow-hidden group"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="relative z-10">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-purple-100 text-sm font-medium">Sync Status</p>
+                    <p className="text-4xl font-bold text-white mt-2">Live</p>
+                  </div>
+                  <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <Server size={28} className="text-white" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-sm text-purple-100">
+                  <Activity size={14} />
+                  <span>Connected to {userInfo?.orgName || 'Salesforce'}</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Action Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            style={styles.ruleTable}
+            transition={{ delay: 0.4 }}
+            className="flex flex-wrap gap-4 mb-8"
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ background: '#f7fafc' }}>
-                <tr>
-                  <th style={{ padding: '16px', textAlign: 'left' }}>Rule Name</th>
-                  <th style={{ padding: '16px', textAlign: 'left' }}>Status</th>
-                  <th style={{ padding: '16px', textAlign: 'left' }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rules.map((rule, index) => (
-                  <motion.tr
-                    key={rule.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    style={{ borderBottom: '1px solid #e2e8f0' }}
-                  >
-                    <td style={{ padding: '16px', fontWeight: '500' }}>{rule.name}</td>
-                    <td style={{ padding: '16px' }}>
-                      <span style={{
-                        ...styles.badge,
-                        background: rule.active ? '#f0fff4' : '#fff5f5',
-                        color: rule.active ? '#48bb78' : '#f56565'
-                      }}>
-                        {rule.active ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                        {rule.active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => toggleRule(rule.name, rule.active)}
-                        style={{
-                          padding: '8px 20px',
-                          background: rule.active ? '#f56565' : '#48bb78',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontWeight: '500'
-                        }}
-                      >
-                        {rule.active ? 'Disable' : 'Enable'}
-                      </motion.button>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
+            <button
+              onClick={fetchMetadata}
+              disabled={loading}
+              className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-semibold flex items-center gap-2 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+            >
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+              {loading ? 'Fetching...' : 'Get Me Metadata'}
+            </button>
+            <button
+              onClick={enableAll}
+              disabled={deploying}
+              className="px-8 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-semibold flex items-center gap-2 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+            >
+              <CheckCircle size={18} />
+              Enable All
+            </button>
+            <button
+              onClick={disableAll}
+              disabled={deploying}
+              className="px-8 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold flex items-center gap-2 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+            >
+              <XCircle size={18} />
+              Disable All
+            </button>
           </motion.div>
-        )}
+
+          {/* Loader */}
+          {(loading || deploying) && (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="relative">
+                <div className="w-20 h-20 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Zap size={24} className="text-purple-600 animate-pulse" />
+                </div>
+              </div>
+              <p className="text-gray-600 font-medium mt-4">
+                {loading ? 'Querying metadata from Salesforce...' : 'Deploying changes to Salesforce...'}
+              </p>
+            </div>
+          )}
+
+          {/* Rules Table */}
+          {!loading && !deploying && rules.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100"
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                      <th className="px-6 py-5 text-left text-sm font-semibold text-gray-700">Rule Name</th>
+                      <th className="px-6 py-5 text-left text-sm font-semibold text-gray-700">Status</th>
+                      <th className="px-6 py-5 text-left text-sm font-semibold text-gray-700">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {rules.map((rule, index) => (
+                      <motion.tr
+                        key={rule.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 transition-all duration-300 cursor-pointer"
+                        onMouseEnter={() => setHoveredRule(rule.id)}
+                        onMouseLeave={() => setHoveredRule(null)}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg flex items-center justify-center">
+                              <Database size={14} className="text-purple-600" />
+                            </div>
+                            <span className="font-semibold text-gray-800">{rule.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${
+                            rule.active
+                              ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border border-green-200'
+                              : 'bg-gradient-to-r from-red-50 to-orange-50 text-red-700 border border-red-200'
+                          }`}>
+                            {rule.active ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                            {rule.active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => toggleRule(rule.name, rule.active)}
+                            className={`px-5 py-2 rounded-xl font-semibold transition-all duration-300 shadow-md ${
+                              rule.active
+                                ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white'
+                                : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+                            }`}
+                          >
+                            {rule.active ? 'Disable' : 'Enable'}
+                          </motion.button>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
+        </main>
       </div>
 
       {/* Alert Toast */}
       <AnimatePresence>
         {alert && (
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            style={{
-              position: 'fixed',
-              bottom: '20px',
-              right: '20px',
-              padding: '14px 24px',
-              borderRadius: '12px',
-              background: alert.type === 'success' ? '#48bb78' : '#f56565',
-              color: 'white',
-              zIndex: 1000,
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-            }}
+            initial={{ opacity: 0, x: 50, y: -20 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 50 }}
+            className="fixed top-24 right-5 z-50"
           >
-            {alert.type === 'success' ? <CheckCircle size={18} style={{ display: 'inline', marginRight: '8px' }} /> : <XCircle size={18} style={{ display: 'inline', marginRight: '8px' }} />}
-            {alert.message}
+            <div className={`backdrop-blur-2xl rounded-2xl px-6 py-4 flex items-center gap-3 shadow-2xl border ${
+              alert.type === 'success' ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30'
+            } text-white`}>
+              {alert.type === 'success' ? <CheckCircle size={20} /> : <XCircle size={20} />}
+              <span className="text-sm font-medium">{alert.message}</span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
