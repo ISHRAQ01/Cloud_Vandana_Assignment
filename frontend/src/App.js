@@ -83,23 +83,37 @@ function App() {
   };
 
   const fetchUserInfo = async () => {
-    try {
-      const res = await axios.get('http://localhost:3001/api/user/info');
-      if (res.data.success) {
-        setUserInfo(res.data.user);
-        setUser({
-          name: res.data.user.name,
-          email: res.data.user.email,
-          username: res.data.user.username,
-          orgName: res.data.user.orgName
-        });
-        console.log('✅ Real user info loaded:', res.data.user);
-      }
-    } catch (error) {
-      console.error('Error fetching user info:', error);
-      setUser({ name: 'Salesforce User', email: 'user@salesforce.com' });
+  try {
+    console.log('Fetching user info...');
+    const res = await axios.get('http://localhost:3001/api/user/info');
+    console.log('User info response:', res.data);
+    
+    if (res.data && res.data.user) {
+      setUserInfo(res.data.user);
+      setUser({
+        name: res.data.user.name,
+        email: res.data.user.email,
+        username: res.data.user.username,
+        orgName: res.data.user.orgName
+      });
+      console.log('✅ User info loaded:', res.data.user);
+    } else if (res.data && res.data.name) {
+      // Handle old response format
+      setUserInfo(res.data);
+      setUser({
+        name: res.data.name,
+        email: res.data.email,
+        username: res.data.username
+      });
+    } else {
+      console.log('⚠️ No user data in response');
+      setUser({ name: 'Salesforce User', email: 'Connected to Salesforce' });
     }
-  };
+  } catch (error) {
+    console.error('Error fetching user info:', error);
+    setUser({ name: 'Salesforce User', email: 'Connected to Salesforce' });
+  }
+};
 
   const toggleRule = async (ruleName, currentStatus) => {
     setDeploying(true);
@@ -151,13 +165,16 @@ function App() {
   };
 
   useEffect(() => {
-    if (window.location.pathname === '/dashboard') {
-      setIsLoggedIn(true);
-      fetchUserInfo();
-      fetchMetadata();
-      window.history.pushState({}, '', '/');
-    }
-  }, []);
+  if (window.location.pathname === '/dashboard') {
+    setIsLoggedIn(true);
+    const loadData = async () => {
+      await fetchUserInfo();
+      await fetchMetadata();
+    };
+    loadData();
+    window.history.pushState({}, '', '/');
+  }
+}, []);
 
   const totalRules = rules.length;
   const activeRules = rules.filter(r => r.active).length;

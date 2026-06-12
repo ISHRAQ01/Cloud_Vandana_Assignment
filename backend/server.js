@@ -228,26 +228,37 @@ app.get('/api/user/info', async (req, res) => {
   const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
   
   console.log('\n👤 Fetching user info from Salesforce...');
+  console.log('Token exists:', !!token);
+  console.log('Instance URL:', instanceUrl);
   
   if (!token) {
+    console.log('❌ No token found');
     return res.status(401).json({ error: 'Not logged in' });
   }
   
   try {
     const response = await fetch(`${instanceUrl}/services/oauth2/userinfo`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
     
-    const userInfo = await response.json();
+    console.log('User Info Response Status:', response.status);
     
-    console.log(`✅ User info fetched: ${userInfo.name} (${userInfo.username})`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const userInfo = await response.json();
+    console.log('✅ User info fetched:', userInfo);
     
     res.json({
       success: true,
       user: {
-        username: userInfo.username,
-        name: userInfo.name,
-        email: userInfo.email,
+        username: userInfo.username || 'unknown',
+        name: userInfo.name || userInfo.username?.split('@')[0] || 'Salesforce User',
+        email: userInfo.email || userInfo.username || 'user@salesforce.com',
         userId: userInfo.user_id,
         orgId: userInfo.organization_id,
         orgName: userInfo.organization_name || 'Salesforce Org',
@@ -255,15 +266,10 @@ app.get('/api/user/info', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error fetching user info:', error);
+    console.error('❌ Error fetching user info:', error.message);
     res.status(500).json({ 
       success: false, 
-      error: error.message,
-      user: {
-        username: 'unknown@salesforce.com',
-        name: 'Salesforce User',
-        email: 'user@salesforce.com'
-      }
+      error: error.message
     });
   }
 });
