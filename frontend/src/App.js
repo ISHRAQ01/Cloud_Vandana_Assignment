@@ -83,37 +83,34 @@ function App() {
   };
 
   const fetchUserInfo = async () => {
-  try {
-    console.log('Fetching user info...');
-    const res = await axios.get('http://localhost:3001/api/user/info');
-    console.log('User info response:', res.data);
-    
-    if (res.data && res.data.user) {
-      setUserInfo(res.data.user);
-      setUser({
-        name: res.data.user.name,
-        email: res.data.user.email,
-        username: res.data.user.username,
-        orgName: res.data.user.orgName
-      });
-      console.log('✅ User info loaded:', res.data.user);
-    } else if (res.data && res.data.name) {
-      // Handle old response format
-      setUserInfo(res.data);
-      setUser({
-        name: res.data.name,
-        email: res.data.email,
-        username: res.data.username
-      });
-    } else {
-      console.log('⚠️ No user data in response');
+    try {
+      console.log('Fetching user info...');
+      const res = await axios.get('http://localhost:3001/api/user/info');
+      console.log('User info response:', res.data);
+      
+      if (res.data && res.data.user) {
+        setUserInfo(res.data.user);
+        setUser({
+          name: res.data.user.name,
+          email: res.data.user.email,
+          username: res.data.user.username,
+          orgName: res.data.user.orgName
+        });
+      } else if (res.data && res.data.name) {
+        setUserInfo(res.data);
+        setUser({
+          name: res.data.name,
+          email: res.data.email,
+          username: res.data.username
+        });
+      } else {
+        setUser({ name: 'Salesforce User', email: 'Connected to Salesforce' });
+      }
+    } catch (error) {
+      console.error('Error fetching user info:', error);
       setUser({ name: 'Salesforce User', email: 'Connected to Salesforce' });
     }
-  } catch (error) {
-    console.error('Error fetching user info:', error);
-    setUser({ name: 'Salesforce User', email: 'Connected to Salesforce' });
-  }
-};
+  };
 
   const toggleRule = async (ruleName, currentStatus) => {
     setDeploying(true);
@@ -165,16 +162,16 @@ function App() {
   };
 
   useEffect(() => {
-  if (window.location.pathname === '/dashboard') {
-    setIsLoggedIn(true);
-    const loadData = async () => {
-      await fetchUserInfo();
-      await fetchMetadata();
-    };
-    loadData();
-    window.history.pushState({}, '', '/');
-  }
-}, []);
+    if (window.location.pathname === '/dashboard') {
+      setIsLoggedIn(true);
+      const loadData = async () => {
+        await fetchUserInfo();
+        await fetchMetadata();
+      };
+      loadData();
+      window.history.pushState({}, '', '/');
+    }
+  }, []);
 
   const totalRules = rules.length;
   const activeRules = rules.filter(r => r.active).length;
@@ -215,7 +212,6 @@ function App() {
                 Enterprise Validation Rule Manager
               </p>
 
-              {/* Environment Selector */}
               <div className="mb-8">
                 <label className="block text-gray-300 text-sm mb-3 font-medium">Select Environment</label>
                 <div className="flex gap-3">
@@ -229,20 +225,9 @@ function App() {
                   >
                     Production
                   </button>
-                  <button
-                    onClick={() => setEnvironment('sandbox')}
-                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                      environment === 'sandbox'
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                        : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                    }`}
-                  >
-                    Sandbox
-                  </button>
                 </div>
               </div>
 
-              {/* Features Grid */}
               <div className="grid grid-cols-3 gap-3 mb-8">
                 <div className="text-center">
                   <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mx-auto mb-2">
@@ -264,7 +249,6 @@ function App() {
                 </div>
               </div>
 
-              {/* Login Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -280,7 +264,6 @@ function App() {
           </motion.div>
         </div>
 
-        {/* Alert Toast */}
         <AnimatePresence>
           {alert && (
             <motion.div
@@ -302,10 +285,8 @@ function App() {
     );
   }
 
-  // Dashboard
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      {/* Sidebar */}
       <motion.aside
         initial={{ x: -300 }}
         animate={{ x: sidebarOpen ? 0 : -300 }}
@@ -376,9 +357,7 @@ function App() {
         </div>
       </motion.aside>
 
-      {/* Main Content */}
       <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-80' : 'ml-0'}`}>
-        {/* Header */}
         <header className="bg-white/80 backdrop-blur-md shadow-lg sticky top-0 z-30 border-b border-gray-100">
           <div className="px-8 py-4 flex justify-between items-center">
             <button
@@ -407,7 +386,6 @@ function App() {
         </header>
 
         <main className="p-8">
-          {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -496,13 +474,7 @@ function App() {
             </motion.div>
           </div>
 
-          {/* Action Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="flex flex-wrap gap-4 mb-8"
-          >
+          <div className="flex flex-wrap gap-4 mb-8">
             <button
               onClick={fetchMetadata}
               disabled={loading}
@@ -527,9 +499,8 @@ function App() {
               <XCircle size={18} />
               Disable All
             </button>
-          </motion.div>
+          </div>
 
-          {/* Loader */}
           {(loading || deploying) && (
             <div className="flex flex-col items-center justify-center py-20">
               <div className="relative">
@@ -544,14 +515,8 @@ function App() {
             </div>
           )}
 
-          {/* Rules Table */}
           {!loading && !deploying && rules.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100"
-            >
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -563,11 +528,8 @@ function App() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {rules.map((rule, index) => (
-                      <motion.tr
+                      <tr
                         key={rule.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
                         className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 transition-all duration-300 cursor-pointer"
                         onMouseEnter={() => setHoveredRule(rule.id)}
                         onMouseLeave={() => setHoveredRule(null)}
@@ -591,9 +553,7 @@ function App() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                          <button
                             onClick={() => toggleRule(rule.name, rule.active)}
                             className={`px-5 py-2 rounded-xl font-semibold transition-all duration-300 shadow-md ${
                               rule.active
@@ -602,19 +562,18 @@ function App() {
                             }`}
                           >
                             {rule.active ? 'Disable' : 'Enable'}
-                          </motion.button>
+                          </button>
                         </td>
-                      </motion.tr>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </motion.div>
+            </div>
           )}
         </main>
       </div>
 
-      {/* Alert Toast */}
       <AnimatePresence>
         {alert && (
           <motion.div

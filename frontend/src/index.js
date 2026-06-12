@@ -4,7 +4,7 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
-// Error Boundary Component (optional but recommended)
+// Error Boundary Component
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -27,48 +27,83 @@ class ErrorBoundary extends React.Component {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a3a 50%, #0f0f23 100%)',
           padding: '20px'
         }}>
           <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '32px',
+            background: 'rgba(26, 26, 58, 0.9)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: '24px',
+            padding: '40px',
             maxWidth: '500px',
             textAlign: 'center',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(139, 92, 246, 0.2)'
           }}>
             <div style={{
-              width: '64px',
-              height: '64px',
-              background: '#f56565',
+              width: '80px',
+              height: '80px',
+              background: 'linear-gradient(135deg, #ef4444, #dc2626)',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 16px'
+              margin: '0 auto 20px',
+              boxShadow: '0 0 20px rgba(239, 68, 68, 0.3)'
             }}>
-              <span style={{ fontSize: '32px' }}>⚠️</span>
+              <span style={{ fontSize: '40px' }}>⚠️</span>
             </div>
-            <h2 style={{ color: '#2d3748', marginBottom: '8px' }}>Something went wrong</h2>
-            <p style={{ color: '#718096', marginBottom: '16px' }}>
+            <h2 style={{ 
+              color: '#f3f4f6', 
+              marginBottom: '12px',
+              fontSize: '24px',
+              fontWeight: 'bold'
+            }}>Something went wrong</h2>
+            <p style={{ 
+              color: '#9ca3af', 
+              marginBottom: '24px',
+              fontSize: '14px'
+            }}>
               The application encountered an unexpected error.
             </p>
             <button
               onClick={() => window.location.reload()}
               style={{
-                padding: '10px 20px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                padding: '12px 24px',
+                background: 'linear-gradient(135deg, #8b5cf6, #ec4899, #f97316)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '8px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 fontSize: '14px',
-                fontWeight: '500'
+                fontWeight: '600',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'scale(1.02)';
+                e.target.style.boxShadow = '0 6px 20px rgba(139, 92, 246, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'scale(1)';
+                e.target.style.boxShadow = '0 4px 15px rgba(139, 92, 246, 0.3)';
               }}
             >
               Reload Application
             </button>
+            {this.state.error && (
+              <p style={{
+                color: '#ef4444',
+                fontSize: '12px',
+                marginTop: '20px',
+                padding: '10px',
+                background: 'rgba(239, 68, 68, 0.1)',
+                borderRadius: '8px',
+                wordBreak: 'break-all'
+              }}>
+                Error: {this.state.error.message}
+              </p>
+            )}
           </div>
         </div>
       );
@@ -96,5 +131,7 @@ console.log(`
 🚀 =====================================
 ✨ Salesforce Switch Application Started
 📡 Environment: ${process.env.NODE_ENV}
+🎨 Theme: Premium Dark Edition
+⚡ Status: Ready
 =====================================
 `);

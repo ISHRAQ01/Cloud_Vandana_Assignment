@@ -15,18 +15,18 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0f0f23 0%, #1a1a3a 50%, #0f0f23 100%);
   min-height: 100vh;
-  color: #1a202c;
+  color: #e5e7eb;
 }
 
 code {
   font-family: 'Fira Code', 'Courier New', Monaco, Menlo, Consolas, monospace;
-  background: #f1f5f9;
+  background: rgba(139, 92, 246, 0.2);
   padding: 2px 6px;
   border-radius: 6px;
   font-size: 0.9em;
-  color: #667eea;
+  color: #a855f7;
 }
 
 /* ========================================
@@ -40,25 +40,25 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: 2.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7, #ec4899, #f97316);
   -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
   background-clip: text;
+  color: transparent;
 }
 
 h2 {
   font-size: 2rem;
-  color: #2d3748;
+  color: #f3f4f6;
 }
 
 h3 {
   font-size: 1.5rem;
-  color: #2d3748;
+  color: #f3f4f6;
 }
 
 p {
   line-height: 1.6;
-  color: #4a5568;
+  color: #9ca3af;
 }
 
 /* ========================================
@@ -66,13 +66,13 @@ p {
    ======================================== */
 
 a {
-  color: #667eea;
+  color: #a855f7;
   text-decoration: none;
   transition: color 0.3s ease;
 }
 
 a:hover {
-  color: #764ba2;
+  color: #ec4899;
   text-decoration: underline;
 }
 
@@ -98,12 +98,21 @@ input, textarea, select {
   font-family: inherit;
   font-size: 1rem;
   transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 12px;
+  padding: 12px 16px;
 }
 
 input:focus, textarea:focus, select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #a855f7;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* ========================================
@@ -118,11 +127,11 @@ table {
 th {
   text-align: left;
   font-weight: 600;
-  color: #4a5568;
+  color: #d1d5db;
 }
 
 td {
-  color: #2d3748;
+  color: #e5e7eb;
 }
 
 /* ========================================
@@ -135,7 +144,7 @@ ul, ol {
 
 li {
   margin: 0.5rem 0;
-  color: #4a5568;
+  color: #9ca3af;
 }
 
 /* ========================================
@@ -256,19 +265,46 @@ img {
 }
 
 .shadow {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
 }
 
 .shadow-md {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
 .shadow-lg {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
 }
 
 .shadow-xl {
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* ========================================
+   Glass Effect
+   ======================================== */
+
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-card {
+  background: rgba(26, 26, 58, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+/* ========================================
+   Gradient Text
+   ======================================== */
+
+.gradient-text {
+  background: linear-gradient(135deg, #a855f7, #ec4899, #f97316);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* ========================================
@@ -303,4 +339,41 @@ img {
   h3 {
     font-size: 1.25rem;
   }
+}
+
+/* ========================================
+   Custom Scrollbar
+   ======================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a3a;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #9333ea, #db2777);
+}
+
+/* ========================================
+   Selection Color
+   ======================================== */
+
+::selection {
+  background: #a855f7;
+  color: white;
+}
+
+::-moz-selection {
+  background: #a855f7;
+  color: white;
 }

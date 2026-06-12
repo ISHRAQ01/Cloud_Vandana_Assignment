@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "SF Switch",
+  "name": "Salesforce Switch - Enterprise Validation Rule Manager",
+  "description": "Manage Salesforce validation rules with OAuth 2.0 authentication and real-time sync",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +21,9 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#8b5cf6",
+  "background_color": "#0f0f23",
+  "orientation": "portrait",
+  "categories": ["business", "productivity", "developer-tools"],
+  "prefer_related_applications": false
 }

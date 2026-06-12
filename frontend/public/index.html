@@ -4,8 +4,10 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#667eea" />
+    <meta name="theme-color" content="#8b5cf6" />
     <meta name="description" content="Salesforce Switch - Enterprise Validation Rule Manager" />
+    <meta name="keywords" content="Salesforce, Validation Rules, Metadata API, OAuth 2.0" />
+    <meta name="author" content="Salesforce Switch" />
     <title>Salesforce Switch | Enterprise Validation Rule Manager</title>
     
     <!-- Tailwind CSS CDN -->
@@ -17,16 +19,37 @@
         theme: {
           extend: {
             colors: {
-              primary: '#667eea',
-              secondary: '#764ba2',
-            }
+              primary: '#8b5cf6',
+              secondary: '#ec4899',
+              accent: '#f97316',
+              dark: '#0f0f23',
+              darker: '#1a1a3a',
+            },
+            animation: {
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'float': 'float 6s ease-in-out infinite',
+              'glow': 'glow 2s ease-in-out infinite',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0px)' },
+                '50%': { transform: 'translateY(-20px)' },
+              },
+              glow: {
+                '0%, 100%': { opacity: 0.5 },
+                '50%': { opacity: 1 },
+              },
+            },
           }
         }
       }
     </script>
     
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    
+    <!-- Font Awesome (for additional icons if needed) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     
     <style>
       * {
@@ -37,20 +60,143 @@
       
       body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #0f0f23 0%, #1a1a3a 50%, #0f0f23 100%);
       }
       
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      
+      ::-webkit-scrollbar-track {
+        background: #1a1a3a;
+        border-radius: 10px;
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #8b5cf6, #ec4899);
+        border-radius: 10px;
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #7c3aed, #db2777);
+      }
+      
+      /* Animations */
       @keyframes float {
         0%, 100% { transform: translateY(0px); }
         50% { transform: translateY(-20px); }
       }
       
+      @keyframes pulse-slow {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 0.6; }
+      }
+      
+      @keyframes spin-slow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      
+      @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      
       .animate-float {
         animation: float 6s ease-in-out infinite;
+      }
+      
+      .animate-pulse-slow {
+        animation: pulse-slow 4s ease-in-out infinite;
+      }
+      
+      .animate-spin-slow {
+        animation: spin-slow 20s linear infinite;
+      }
+      
+      .animate-gradient {
+        background-size: 200% 200%;
+        animation: gradient 3s ease infinite;
+      }
+      
+      /* Glass Morphism */
+      .glass {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      .glass-card {
+        background: rgba(26, 26, 58, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+      }
+      
+      /* Gradient Text */
+      .gradient-text {
+        background: linear-gradient(135deg, #8b5cf6, #ec4899, #f97316);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      
+      /* Hover Effects */
+      .hover-glow:hover {
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+        transition: all 0.3s ease;
+      }
+      
+      /* Loading Spinner */
+      .spinner {
+        width: 48px;
+        height: 48px;
+        border: 3px solid rgba(139, 92, 246, 0.2);
+        border-top: 3px solid #8b5cf6;
+        border-radius: 50%;
+        animation: spin-slow 1s linear infinite;
+      }
+      
+      /* Selection Color */
+      ::selection {
+        background: #8b5cf6;
+        color: white;
+      }
+      
+      /* Smooth Transitions */
+      * {
+        transition: all 0.2s ease;
+      }
+      
+      /* Focus Styles */
+      button:focus, a:focus {
+        outline: 2px solid #8b5cf6;
+        outline-offset: 2px;
       }
     </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>
+      <div style="
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #0f0f23, #1a1a3a);
+        color: white;
+        font-family: 'Inter', sans-serif;
+        text-align: center;
+        padding: 20px;
+      ">
+        <div>
+          <h1 style="font-size: 24px; margin-bottom: 16px;">JavaScript Required</h1>
+          <p style="color: #9ca3af;">Please enable JavaScript to use Salesforce Switch.</p>
+          <p style="color: #6b7280; font-size: 14px; margin-top: 12px;">Enterprise Validation Rule Manager</p>
+        </div>
+      </div>
+    </noscript>
     <div id="root"></div>
   </body>
 </html>
