@@ -3,23 +3,16 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Shield, 
-  Lock, 
-  Mail, 
   LogIn, 
   LogOut, 
   RefreshCw, 
-  Settings, 
   CheckCircle, 
   XCircle,
-  Zap,
   Database,
   Cloud,
   Activity,
   Bell,
-  User,
-  ChevronDown,
-  Menu,
-  X
+  User
 } from 'lucide-react';
 
 axios.defaults.withCredentials = true;
@@ -32,43 +25,19 @@ function App() {
   const [user, setUser] = useState(null);
   const [environment, setEnvironment] = useState('production');
   const [alert, setAlert] = useState(null);
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
-  const [showCredentials, setShowCredentials] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const showAlert = (message, type = 'success') => {
     setAlert({ message, type });
     setTimeout(() => setAlert(null), 4000);
   };
 
+  // OAuth Login
   const handleLogin = async () => {
-    if (showCredentials) {
-      // Custom login with username/password
-      setLoading(true);
-      try {
-        const res = await axios.post('http://localhost:3001/auth/custom-login', {
-          username: credentials.username,
-          password: credentials.password,
-          environment: environment
-        });
-        if (res.data.success) {
-          setUser(res.data.user);
-          setIsLoggedIn(true);
-          showAlert('Login successful! Welcome back.', 'success');
-          fetchMetadata();
-        }
-      } catch (error) {
-        showAlert('Invalid credentials. Please try again.', 'error');
-      }
-      setLoading(false);
-    } else {
-      // OAuth login
-      try {
-        const res = await axios.get('http://localhost:3001/auth/login');
-        window.location.href = res.data.url;
-      } catch (error) {
-        showAlert('Login failed: ' + error.message, 'error');
-      }
+    try {
+      const res = await axios.get('http://localhost:3001/auth/login');
+      window.location.href = res.data.url;
+    } catch (error) {
+      showAlert('Login failed: ' + error.message, 'error');
     }
   };
 
@@ -77,7 +46,6 @@ function App() {
     setIsLoggedIn(false);
     setRules([]);
     setUser(null);
-    setCredentials({ username: '', password: '' });
     showAlert('Logged out successfully', 'success');
   };
 
@@ -126,7 +94,7 @@ function App() {
       }
     }
     await fetchMetadata();
-    showAlert(`Complete - All changes have been successfully deployed to ${environment === 'production' ? 'Production' : 'Sandbox'}`, 'success');
+    showAlert(`Complete - All changes have been successfully deployed`, 'success');
     setDeploying(false);
   };
 
@@ -136,18 +104,13 @@ function App() {
   useEffect(() => {
     if (window.location.pathname === '/dashboard') {
       setIsLoggedIn(true);
-      setUser({ username: 'Salesforce User', org: 'Developer Edition', email: 'user@salesforce.com' });
       fetchMetadata();
       window.history.pushState({}, '', '/');
     }
   }, []);
 
-  // Premium Styles
+  // Styles
   const styles = {
-    gradientBg: {
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    },
     loginContainer: {
       minHeight: '100vh',
       display: 'flex',
@@ -172,15 +135,6 @@ function App() {
       alignItems: 'center',
       justifyContent: 'center',
       margin: '0 auto 24px',
-    },
-    input: {
-      width: '100%',
-      padding: '14px 16px',
-      border: '1px solid #e2e8f0',
-      borderRadius: '12px',
-      fontSize: '14px',
-      transition: 'all 0.3s',
-      outline: 'none',
     },
     button: {
       width: '100%',
@@ -207,7 +161,6 @@ function App() {
       top: 0,
       bottom: 0,
       zIndex: 40,
-      transition: 'transform 0.3s ease',
     },
     mainContent: {
       marginLeft: '280px',
@@ -255,7 +208,7 @@ function App() {
             Enterprise Validation Rule Manager
           </p>
 
-          {/* Environment Toggle */}
+          {/* Environment Selector */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Environment</label>
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -264,12 +217,11 @@ function App() {
                 style={{
                   flex: 1,
                   padding: '10px',
-                  background: environment === 'production' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#f1f5f9',
+                  background: environment === 'production' ? '#667eea' : '#f1f5f9',
                   color: environment === 'production' ? 'white' : '#475569',
                   border: 'none',
                   borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontWeight: '500'
+                  cursor: 'pointer'
                 }}
               >
                 Production
@@ -279,12 +231,11 @@ function App() {
                 style={{
                   flex: 1,
                   padding: '10px',
-                  background: environment === 'sandbox' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#f1f5f9',
+                  background: environment === 'sandbox' ? '#667eea' : '#f1f5f9',
                   color: environment === 'sandbox' ? 'white' : '#475569',
                   border: 'none',
                   borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontWeight: '500'
+                  cursor: 'pointer'
                 }}
               >
                 Sandbox
@@ -292,77 +243,12 @@ function App() {
             </div>
           </div>
 
-          {/* Login Method Toggle */}
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-              <button
-                onClick={() => setShowCredentials(false)}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  background: !showCredentials ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#f1f5f9',
-                  color: !showCredentials ? 'white' : '#475569',
-                  border: 'none',
-                  borderRadius: '10px',
-                  cursor: 'pointer'
-                }}
-              >
-                OAuth 2.0
-              </button>
-              <button
-                onClick={() => setShowCredentials(true)}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  background: showCredentials ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#f1f5f9',
-                  color: showCredentials ? 'white' : '#475569',
-                  border: 'none',
-                  borderRadius: '10px',
-                  cursor: 'pointer'
-                }}
-              >
-                Username/Password
-              </button>
-            </div>
+          {/* OAuth Info */}
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <p style={{ fontSize: '13px', color: '#718096' }}>
+              You will be redirected to Salesforce login page
+            </p>
           </div>
-
-          {/* Credentials Form */}
-          <AnimatePresence>
-            {showCredentials && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-              >
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                    <Mail size={16} style={{ display: 'inline', marginRight: '8px' }} />
-                    Username / Email
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="admin@salesforce.com"
-                    value={credentials.username}
-                    onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-                    style={styles.input}
-                  />
-                </div>
-                <div style={{ marginBottom: '24px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                    <Lock size={16} style={{ display: 'inline', marginRight: '8px' }} />
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={credentials.password}
-                    onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                    style={styles.input}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -374,13 +260,13 @@ function App() {
             {loading ? 'Connecting...' : (
               <>
                 <LogIn size={18} style={{ display: 'inline', marginRight: '8px' }} />
-                {showCredentials ? 'Login to Salesforce' : 'Login with OAuth'}
+                Login with OAuth
               </>
             )}
           </motion.button>
 
           <p style={{ textAlign: 'center', fontSize: '12px', color: '#a0aec0', marginTop: '24px' }}>
-            Secured by OAuth 2.0 Protocol
+            Secured by OAuth 2.0 Protocol & Salesforce APIs
           </p>
         </motion.div>
 
@@ -410,7 +296,7 @@ function App() {
     );
   }
 
-  // Premium Dashboard
+  // Dashboard
   return (
     <div style={styles.dashboardContainer}>
       {/* Sidebar */}
@@ -470,16 +356,14 @@ function App() {
             <p style={{ color: '#718096' }}>Manage Account object validation rules in real-time</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ position: 'relative' }}>
-              <Bell size={20} color="#718096" />
-            </div>
+            <Bell size={20} color="#718096" />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <User size={20} color="white" />
               </div>
               <div>
-                <p style={{ fontWeight: '500', fontSize: '14px' }}>{user?.username || 'Admin User'}</p>
-                <p style={{ fontSize: '12px', color: '#718096' }}>{user?.email || 'admin@salesforce.com'}</p>
+                <p style={{ fontWeight: '500', fontSize: '14px' }}>{user?.name || user?.username || 'Salesforce User'}</p>
+                <p style={{ fontSize: '12px', color: '#718096' }}>{user?.email || 'Connected to Salesforce'}</p>
               </div>
             </div>
           </div>

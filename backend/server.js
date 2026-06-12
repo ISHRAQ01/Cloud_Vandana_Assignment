@@ -18,6 +18,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: { 
     secure: false,
+    httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
@@ -26,6 +27,7 @@ let globalAccessToken = null;
 let globalInstanceUrl = null;
 let cachedRules = [];
 
+// ==================== OAuth 2.0 LOGIN ====================
 app.get('/auth/login', (req, res) => {
   const redirectUri = 'http://localhost:3001/oauth/callback';
   const state = crypto.randomBytes(16).toString('hex');
@@ -38,9 +40,11 @@ app.get('/auth/login', (req, res) => {
     `scope=api refresh_token&` +
     `state=${state}`;
   
+  console.log('\n🔐 OAuth Login URL generated');
   res.json({ url: loginUrl });
 });
 
+// OAuth Callback
 app.get('/oauth/callback', async (req, res) => {
   const { code, state } = req.query;
   
@@ -70,20 +74,27 @@ app.get('/oauth/callback', async (req, res) => {
     
     req.session.accessToken = tokenData.access_token;
     req.session.instanceUrl = tokenData.instance_url;
+    req.session.userId = tokenData.id;
+    
     globalAccessToken = tokenData.access_token;
     globalInstanceUrl = tokenData.instance_url;
     
-    console.log('✅ Login successful!');
+    console.log('✅ OAuth Login successful!');
     res.redirect('http://localhost:3000/dashboard');
   } catch (error) {
-    console.error('OAuth error:', error);
+    console.error('❌ OAuth error:', error);
     res.status(500).send('OAuth failed: ' + error.message);
   }
 });
 
+// ==================== VALIDATION RULES ENDPOINTS ====================
+
+// Get all validation rules
 app.get('/api/validation-rules', async (req, res) => {
   const token = req.session?.accessToken || globalAccessToken;
   const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
+  
+  console.log('\n📊 Fetching validation rules...');
   
   if (!token) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -98,8 +109,11 @@ app.get('/api/validation-rules', async (req, res) => {
     const idData = await idResponse.json();
     
     if (!idData.records || idData.records.length === 0) {
+      console.log('No validation rules found');
       return res.json([]);
     }
+    
+    console.log(`Found ${idData.records.length} rule IDs`);
     
     const rules = [];
     for (const record of idData.records) {
@@ -124,23 +138,24 @@ app.get('/api/validation-rules', async (req, res) => {
     
     cachedRules = rules;
     
-    console.log(`✅ Retrieved ${rules.length} rules`);
-    rules.forEach(r => console.log(`  - ${r.name}: ${r.active ? 'Active' : 'Inactive'}`));
+    console.log(`✅ Retrieved ${rules.length} validation rules`);
+    rules.forEach(r => console.log(`  - ${r.name}: ${r.active ? '🟢 Active' : '🔴 Inactive'}`));
     
     res.json(rules);
     
   } catch (error) {
-    console.error('Error:', error.message);
-    res.json([]);
+    console.error('❌ Error fetching rules:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
+// Update validation rule
 app.post('/api/update-rule', async (req, res) => {
   const { ruleName, active } = req.body;
   const token = req.session?.accessToken || globalAccessToken;
   const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
   
-  console.log(`📝 Updating "${ruleName}" to ${active ? 'Active' : 'Inactive'}`);
+  console.log(`\n📝 Updating rule: "${ruleName}" → ${active ? '🟢 Active' : '🔴 Inactive'}`);
   
   if (!token) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -151,12 +166,11 @@ app.post('/api/update-rule', async (req, res) => {
     
     if (!rule) {
       console.log(`❌ Rule "${ruleName}" not found`);
-      return res.json({ success: false });
+      return res.json({ success: false, error: 'Rule not found' });
     }
     
     console.log(`Found rule: ${rule.fullName} (ID: ${rule.id})`);
     
-    // Get current rule data
     const getResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.id}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -164,7 +178,6 @@ app.post('/api/update-rule', async (req, res) => {
     const ruleData = await getResponse.json();
     const currentMetadata = ruleData.Metadata || {};
     
-    // Prepare update with all required fields
     const updateMetadata = {
       active: active,
       errorConditionFormula: currentMetadata.errorConditionFormula || 'true',
@@ -194,14 +207,46 @@ app.post('/api/update-rule', async (req, res) => {
     }
     
   } catch (error) {
-    console.error('Update error:', error.message);
+    console.error('❌ Update error:', error.message);
     res.json({ success: false });
   }
 });
 
+// ==================== UTILITY ENDPOINTS ====================
+
 app.get('/api/auth/status', (req, res) => {
   const token = req.session?.accessToken || globalAccessToken;
-  res.json({ isLoggedIn: !!token });
+  res.json({ 
+    isLoggedIn: !!token
+  });
+});
+
+app.get('/api/user/info', async (req, res) => {
+  const token = req.session?.accessToken || globalAccessToken;
+  const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  try {
+    const response = await fetch(`${instanceUrl}/services/oauth2/userinfo`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const userInfo = await response.json();
+    
+    res.json({
+      username: userInfo.username,
+      name: userInfo.name,
+      email: userInfo.email,
+      orgId: userInfo.organization_id
+    });
+  } catch (error) {
+    res.json({
+      username: 'Salesforce User',
+      email: 'user@salesforce.com'
+    });
+  }
 });
 
 app.get('/auth/logout', (req, res) => {
@@ -209,10 +254,27 @@ app.get('/auth/logout', (req, res) => {
   globalAccessToken = null;
   globalInstanceUrl = null;
   cachedRules = [];
+  console.log('👋 User logged out');
   res.json({ success: true });
 });
 
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// ==================== START SERVER ====================
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`✅ Backend running on http://localhost:${PORT}`);
+  console.log('\n🚀 =====================================');
+  console.log('✨ Salesforce Switch Backend Server');
+  console.log('=====================================');
+  console.log(`📡 Server: http://localhost:${PORT}`);
+  console.log(`🔐 OAuth Login: http://localhost:${PORT}/auth/login`);
+  console.log(`💚 Health: http://localhost:${PORT}/api/health`);
+  console.log('=====================================\n');
 });
