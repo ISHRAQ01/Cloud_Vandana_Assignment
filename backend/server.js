@@ -6,19 +6,44 @@ const crypto = require('crypto');
 
 const app = express();
 
+// ==================== CORS CONFIGURATION FROM ENV ====================
+// Get allowed origins from .env or use defaults
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',')
+  : ['http://localhost:3000', 'https://vandana-assignment.vercel.app'];
+
+console.log('✅ Allowed CORS Origins:', allowedOrigins);
+
 app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('❌ Blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
+
 app.use(express.json());
+
+// Trust proxy for secure cookies in production
+app.set('trust proxy', 1);
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: false,
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
@@ -29,7 +54,8 @@ let cachedRules = [];
 
 // ==================== OAuth 2.0 LOGIN ====================
 app.get('/auth/login', (req, res) => {
-  const redirectUri = 'http://localhost:3001/oauth/callback';
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+  const redirectUri = `${backendUrl}/oauth/callback`;
   const state = crypto.randomBytes(16).toString('hex');
   req.session.oauthState = state;
   
@@ -47,18 +73,21 @@ app.get('/auth/login', (req, res) => {
 // OAuth Callback
 app.get('/oauth/callback', async (req, res) => {
   const { code, state } = req.query;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
   
   if (state !== req.session.oauthState) {
     return res.status(400).send('Invalid state parameter');
   }
   
   try {
+    const redirectUri = `${backendUrl}/oauth/callback`;
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
     params.append('code', code);
     params.append('client_id', process.env.CLIENT_ID);
     params.append('client_secret', process.env.CLIENT_SECRET);
-    params.append('redirect_uri', 'http://localhost:3001/oauth/callback');
+    params.append('redirect_uri', redirectUri);
     
     const response = await fetch('https://login.salesforce.com/services/oauth2/token', {
       method: 'POST',
@@ -80,7 +109,7 @@ app.get('/oauth/callback', async (req, res) => {
     globalInstanceUrl = tokenData.instance_url;
     
     console.log('✅ OAuth Login successful!');
-    res.redirect('http://localhost:3000/dashboard');
+    res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
     console.error('❌ OAuth error:', error);
     res.status(500).send('OAuth failed: ' + error.message);
@@ -222,17 +251,14 @@ app.get('/api/auth/status', (req, res) => {
   });
 });
 
-// Get current user info from Salesforce (REAL USER DATA)
+// Get current user info from Salesforce
 app.get('/api/user/info', async (req, res) => {
   const token = req.session?.accessToken || globalAccessToken;
   const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
   
   console.log('\n👤 Fetching user info from Salesforce...');
-  console.log('Token exists:', !!token);
-  console.log('Instance URL:', instanceUrl);
   
   if (!token) {
-    console.log('❌ No token found');
     return res.status(401).json({ error: 'Not logged in' });
   }
   
@@ -244,21 +270,18 @@ app.get('/api/user/info', async (req, res) => {
       }
     });
     
-    console.log('User Info Response Status:', response.status);
-    
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
     
     const userInfo = await response.json();
-    console.log('✅ User info fetched:', userInfo);
     
     res.json({
       success: true,
       user: {
         username: userInfo.username || 'unknown',
-        name: userInfo.name || userInfo.username?.split('@')[0] || 'Salesforce User',
-        email: userInfo.email || userInfo.username || 'user@salesforce.com',
+        name: userInfo.name || 'Salesforce User',
+        email: userInfo.email || userInfo.username,
         userId: userInfo.user_id,
         orgId: userInfo.organization_id,
         orgName: userInfo.organization_name || 'Salesforce Org',
@@ -267,10 +290,7 @@ app.get('/api/user/info', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error fetching user info:', error.message);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -302,7 +322,6 @@ app.listen(PORT, () => {
   console.log('=====================================');
   console.log(`📡 Server: http://localhost:${PORT}`);
   console.log(`🔐 OAuth Login: http://localhost:${PORT}/auth/login`);
-  console.log(`👤 User Info: http://localhost:${PORT}/api/user/info`);
   console.log(`💚 Health: http://localhost:${PORT}/api/health`);
   console.log('=====================================\n');
 });
