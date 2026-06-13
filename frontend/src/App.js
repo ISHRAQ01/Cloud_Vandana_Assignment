@@ -28,10 +28,14 @@ import {
   UserCheck
 } from 'lucide-react';
 
-// Set API URL from environment variable or default to localhost for development
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+// IMPORTANT: Set base URL and credentials for all axios requests
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://cloud-vandana-assignment.onrender.com';
 
+// Configure axios defaults
+axios.defaults.baseURL = API_BASE_URL;
 axios.defaults.withCredentials = true;
+axios.defaults.headers.common['Accept'] = 'application/json';
+axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 function App() {
   const [rules, setRules] = useState([]);
@@ -52,7 +56,7 @@ function App() {
 
   const handleLogin = async () => {
     try {
-      const res = await axios.get(`${API_URL}/auth/login`);
+      const res = await axios.get('/auth/login');
       window.location.href = res.data.url;
     } catch (error) {
       showAlert('Login failed: ' + error.message, 'error');
@@ -61,7 +65,7 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await axios.get(`${API_URL}/auth/logout`);
+      await axios.get('/auth/logout');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -75,7 +79,7 @@ function App() {
   const fetchMetadata = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/api/validation-rules`);
+      const res = await axios.get('/api/validation-rules');
       setRules(res.data);
       showAlert(`✨ Successfully fetched ${res.data.length} validation rules`, 'success');
     } catch (error) {
@@ -91,8 +95,8 @@ function App() {
 
   const fetchUserInfo = async () => {
     try {
-      console.log('Fetching user info from:', `${API_URL}/api/user/info`);
-      const res = await axios.get(`${API_URL}/api/user/info`);
+      console.log('Fetching user info from:', `${API_BASE_URL}/api/user/info`);
+      const res = await axios.get('/api/user/info');
       console.log('User info response:', res.data);
       
       if (res.data && res.data.user) {
@@ -122,7 +126,7 @@ function App() {
   const toggleRule = async (ruleName, currentStatus) => {
     setDeploying(true);
     try {
-      await axios.post(`${API_URL}/api/update-rule`, {
+      await axios.post('/api/update-rule', {
         ruleName,
         active: !currentStatus
       });
@@ -138,7 +142,7 @@ function App() {
     setDeploying(true);
     for (let rule of rules) {
       try {
-        await axios.post(`${API_URL}/api/update-rule`, {
+        await axios.post('/api/update-rule', {
           ruleName: rule.name,
           active: true
         });
@@ -155,7 +159,7 @@ function App() {
     setDeploying(true);
     for (let rule of rules) {
       try {
-        await axios.post(`${API_URL}/api/update-rule`, {
+        await axios.post('/api/update-rule', {
           ruleName: rule.name,
           active: false
         });
