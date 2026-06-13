@@ -42,14 +42,15 @@ app.use(cors({
 app.use(express.json());
 app.set('trust proxy', 1);
 
+// ==================== SESSION CONFIGURATION (FIXED FOR CROSS-ORIGIN) ====================
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true,  // CHANGED: must be true for cross-origin
   cookie: { 
-    secure: false,
+    secure: false,  // false for HTTP (Render uses HTTPS but this works)
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'none',  // CHANGED: required for cross-origin requests
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
@@ -65,6 +66,10 @@ app.get('/auth/login', (req, res) => {
   const state = crypto.randomBytes(16).toString('hex');
   req.session.oauthState = state;
   
+  console.log('\n🔐 OAuth Login URL generated');
+  console.log('🔐 State stored in session:', state);
+  console.log('🔐 Session ID:', req.session.id);
+  
   const loginUrl = `https://login.salesforce.com/services/oauth2/authorize?` +
     `response_type=code&` +
     `client_id=${process.env.CLIENT_ID}&` +
@@ -72,7 +77,6 @@ app.get('/auth/login', (req, res) => {
     `scope=api refresh_token&` +
     `state=${state}`;
   
-  console.log('\n🔐 OAuth Login URL generated');
   res.json({ url: loginUrl });
 });
 
@@ -82,8 +86,26 @@ app.get('/oauth/callback', async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://vandana-assignment.vercel.app';
   const backendUrl = process.env.BACKEND_URL || 'https://cloud-vandana-assignment.onrender.com';
   
+  console.log('\n📞 OAuth Callback received');
+  console.log('📞 State from query:', state);
+  console.log('📞 State from session:', req.session?.oauthState);
+  console.log('📞 Session ID:', req.session?.id);
+  
+  if (!req.session) {
+    console.error('❌ No session found');
+    return res.status(400).send('No session found');
+  }
+  
   if (state !== req.session.oauthState) {
+    console.error('❌ Invalid state parameter');
+    console.error('Expected:', req.session.oauthState);
+    console.error('Received:', state);
     return res.status(400).send('Invalid state parameter');
+  }
+  
+  if (!code) {
+    console.error('❌ No authorization code received');
+    return res.status(400).send('No authorization code received');
   }
   
   try {
@@ -95,6 +117,8 @@ app.get('/oauth/callback', async (req, res) => {
     params.append('client_secret', process.env.CLIENT_SECRET);
     params.append('redirect_uri', redirectUri);
     
+    console.log('🔄 Exchanging code for token...');
+    
     const response = await fetch('https://login.salesforce.com/services/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -104,6 +128,7 @@ app.get('/oauth/callback', async (req, res) => {
     const tokenData = await response.json();
     
     if (tokenData.error) {
+      console.error('❌ Token error:', tokenData);
       throw new Error(tokenData.error_description);
     }
     
@@ -115,6 +140,8 @@ app.get('/oauth/callback', async (req, res) => {
     globalInstanceUrl = tokenData.instance_url;
     
     console.log('✅ OAuth Login successful!');
+    console.log('✅ User ID:', tokenData.id);
+    
     res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
     console.error('❌ OAuth error:', error);
