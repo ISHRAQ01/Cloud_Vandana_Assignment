@@ -25,14 +25,6 @@ Salesforce Switch is an enterprise-grade web application that allows Salesforce 
 | **Frontend (Vercel)** | [https://vandana-assignment.vercel.app](https://vandana-assignment.vercel.app) |
 | **Backend API (Render)** | [https://cloud-vandana-assignment.onrender.com](https://cloud-vandana-assignment.onrender.com) |
 
-## 📸 Screenshots
-
-### Login Page
-![Login Page](https://via.placeholder.com/800x500?text=Premium+Login+Page)
-
-### Dashboard
-![Dashboard](https://via.placeholder.com/800x500?text=Validation+Rules+Dashboard)
-
 ## 🛠️ Tech Stack
 
 ### Frontend
