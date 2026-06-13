@@ -6,30 +6,32 @@ const crypto = require('crypto');
 
 const app = express();
 
+// Helper function to clean URLs (remove trailing slashes)
+const cleanUrl = (url) => url ? url.replace(/\/$/, '') : url;
+
+// Get and clean environment variables
+const rawOrigins = process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [];
+const allowedOrigins = rawOrigins.map(origin => cleanUrl(origin));
+const frontendUrl = cleanUrl(process.env.FRONTEND_URL) || 'https://vandana-assignment.vercel.app';
+const backendUrl = cleanUrl(process.env.BACKEND_URL) || 'https://cloud-vandana-assignment.onrender.com';
+
+console.log('✅ Cleaned CORS Origins:', allowedOrigins);
+console.log('✅ Cleaned Frontend URL:', frontendUrl);
+console.log('✅ Cleaned Backend URL:', backendUrl);
+
 // ==================== CORS CONFIGURATION ====================
-const allowedOrigins = process.env.CORS_ORIGINS 
-  ? process.env.CORS_ORIGINS.split(',')
-  : ['http://localhost:3000', 'https://vandana-assignment.vercel.app'];
-
-console.log('✅ Allowed CORS Origins:', allowedOrigins);
-
-// Remove trailing slashes from origins
-const cleanOrigins = allowedOrigins.map(origin => origin.replace(/\/$/, ''));
-
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
+    // Allow requests with no origin
     if (!origin) return callback(null, true);
     
-    // Clean the incoming origin
-    const cleanOrigin = origin.replace(/\/$/, '');
+    const cleanOrigin = cleanUrl(origin);
     
-    if (cleanOrigins.indexOf(cleanOrigin) !== -1) {
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(cleanOrigin)) {
       callback(null, true);
     } else {
       console.log('❌ Blocked origin:', origin);
-      // Temporarily allow all for debugging - REMOVE AFTER FIXED
-      callback(null, true);
+      callback(null, true); // Temporarily allow for debugging
     }
   },
   credentials: true,
@@ -38,19 +40,22 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie']
 }));
 
+// Handle preflight requests
+app.options('*', cors());
+
 // ==================== OTHER MIDDLEWARE ====================
 app.use(express.json());
 app.set('trust proxy', 1);
 
-// ==================== SESSION CONFIGURATION (FIXED FOR CROSS-ORIGIN) ====================
+// ==================== SESSION CONFIGURATION (FIXED) ====================
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
-  saveUninitialized: true,  // CHANGED: must be true for cross-origin
+  saveUninitialized: false,
   cookie: { 
-    secure: false,  // false for HTTP (Render uses HTTPS but this works)
+    secure: true,        // Must be true for HTTPS (Render serves over HTTPS)
     httpOnly: true,
-    sameSite: 'none',  // CHANGED: required for cross-origin requests
+    sameSite: 'none',    // Required for cross-origin (Vercel -> Render)
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
@@ -61,7 +66,6 @@ let cachedRules = [];
 
 // ==================== OAuth 2.0 LOGIN ====================
 app.get('/auth/login', (req, res) => {
-  const backendUrl = process.env.BACKEND_URL || 'https://cloud-vandana-assignment.onrender.com';
   const redirectUri = `${backendUrl}/oauth/callback`;
   const state = crypto.randomBytes(16).toString('hex');
   req.session.oauthState = state;
@@ -69,6 +73,7 @@ app.get('/auth/login', (req, res) => {
   console.log('\n🔐 OAuth Login URL generated');
   console.log('🔐 State stored in session:', state);
   console.log('🔐 Session ID:', req.session.id);
+  console.log('🔐 Redirect URI:', redirectUri);
   
   const loginUrl = `https://login.salesforce.com/services/oauth2/authorize?` +
     `response_type=code&` +
@@ -83,19 +88,19 @@ app.get('/auth/login', (req, res) => {
 // OAuth Callback
 app.get('/oauth/callback', async (req, res) => {
   const { code, state } = req.query;
-  const frontendUrl = process.env.FRONTEND_URL || 'https://vandana-assignment.vercel.app';
-  const backendUrl = process.env.BACKEND_URL || 'https://cloud-vandana-assignment.onrender.com';
   
   console.log('\n📞 OAuth Callback received');
   console.log('📞 State from query:', state);
-  console.log('📞 State from session:', req.session?.oauthState);
   console.log('📞 Session ID:', req.session?.id);
+  console.log('📞 Session oauthState:', req.session?.oauthState);
   
+  // Check session
   if (!req.session) {
     console.error('❌ No session found');
     return res.status(400).send('No session found');
   }
   
+  // Validate state parameter
   if (state !== req.session.oauthState) {
     console.error('❌ Invalid state parameter');
     console.error('Expected:', req.session.oauthState);
@@ -353,8 +358,8 @@ app.listen(PORT, () => {
   console.log('\n🚀 =====================================');
   console.log('✨ Salesforce Switch Backend Server');
   console.log('=====================================');
-  console.log(`📡 Server: http://localhost:${PORT}`);
-  console.log(`🔐 OAuth Login: http://localhost:${PORT}/auth/login`);
-  console.log(`💚 Health: http://localhost:${PORT}/api/health`);
+  console.log(`📡 Server: ${backendUrl}`);
+  console.log(`🔐 OAuth Login: ${backendUrl}/auth/login`);
+  console.log(`💚 Health: ${backendUrl}/api/health`);
   console.log('=====================================\n');
 });
