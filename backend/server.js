@@ -6,7 +6,7 @@ const crypto = require('crypto');
 
 const app = express();
 
-// ==================== CORS CONFIGURATION FROM ENV ====================
+// ==================== CORS CONFIGURATION (MUST BE FIRST) ====================
 // Get allowed origins from .env or use defaults
 const allowedOrigins = process.env.CORS_ORIGINS 
   ? process.env.CORS_ORIGINS.split(',')
@@ -14,6 +14,7 @@ const allowedOrigins = process.env.CORS_ORIGINS
 
 console.log('✅ Allowed CORS Origins:', allowedOrigins);
 
+// CORS middleware - MUST be first
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl)
@@ -23,14 +24,20 @@ app.use(cors({
       callback(null, true);
     } else {
       console.log('❌ Blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
+      // For production, you may want to allow it anyway for debugging
+      callback(null, true); // TEMPORARILY ALLOW ALL - REMOVE AFTER FIXED
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Set-Cookie']
 }));
 
+// Handle preflight requests for all routes
+app.options('*', cors());
+
+// ==================== OTHER MIDDLEWARE ====================
 app.use(express.json());
 
 // Trust proxy for secure cookies in production
@@ -41,7 +48,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // Set to false for Render (HTTP)
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000
@@ -54,7 +61,7 @@ let cachedRules = [];
 
 // ==================== OAuth 2.0 LOGIN ====================
 app.get('/auth/login', (req, res) => {
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+  const backendUrl = process.env.BACKEND_URL || 'https://cloud-vandana-assignment.onrender.com';
   const redirectUri = `${backendUrl}/oauth/callback`;
   const state = crypto.randomBytes(16).toString('hex');
   req.session.oauthState = state;
@@ -73,8 +80,8 @@ app.get('/auth/login', (req, res) => {
 // OAuth Callback
 app.get('/oauth/callback', async (req, res) => {
   const { code, state } = req.query;
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+  const frontendUrl = process.env.FRONTEND_URL || 'https://vandana-assignment.vercel.app';
+  const backendUrl = process.env.BACKEND_URL || 'https://cloud-vandana-assignment.onrender.com';
   
   if (state !== req.session.oauthState) {
     return res.status(400).send('Invalid state parameter');
