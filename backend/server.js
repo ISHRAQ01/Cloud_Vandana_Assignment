@@ -6,26 +6,30 @@ const crypto = require('crypto');
 
 const app = express();
 
-// ==================== CORS CONFIGURATION (MUST BE FIRST) ====================
-// Get allowed origins from .env or use defaults
+// ==================== CORS CONFIGURATION ====================
 const allowedOrigins = process.env.CORS_ORIGINS 
   ? process.env.CORS_ORIGINS.split(',')
   : ['http://localhost:3000', 'https://vandana-assignment.vercel.app'];
 
 console.log('✅ Allowed CORS Origins:', allowedOrigins);
 
-// CORS middleware - MUST be first
+// Remove trailing slashes from origins
+const cleanOrigins = allowedOrigins.map(origin => origin.replace(/\/$/, ''));
+
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Clean the incoming origin
+    const cleanOrigin = origin.replace(/\/$/, '');
+    
+    if (cleanOrigins.indexOf(cleanOrigin) !== -1) {
       callback(null, true);
     } else {
       console.log('❌ Blocked origin:', origin);
-      // For production, you may want to allow it anyway for debugging
-      callback(null, true); // TEMPORARILY ALLOW ALL - REMOVE AFTER FIXED
+      // Temporarily allow all for debugging - REMOVE AFTER FIXED
+      callback(null, true);
     }
   },
   credentials: true,
@@ -34,13 +38,8 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie']
 }));
 
-// Handle preflight requests for all routes
-app.options('*', cors());
-
 // ==================== OTHER MIDDLEWARE ====================
 app.use(express.json());
-
-// Trust proxy for secure cookies in production
 app.set('trust proxy', 1);
 
 app.use(session({
@@ -48,7 +47,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: false, // Set to false for Render (HTTP)
+    secure: false,
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000
