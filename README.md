@@ -1,7 +1,4 @@
 # Salesforce Switch - Enterprise Validation Rule Manager
-
-![Salesforce Switch Banner](https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?q=80&w=1974&auto=format)
-
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-000?style=for-the-badge&logo=vercel)](https://vandana-assignment.vercel.app)
 [![Backend API](https://img.shields.io/badge/Backend_API-Render-46E3B7?style=for-the-badge&logo=render)](https://cloud-vandana-assignment.onrender.com/api/health)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
@@ -27,7 +24,6 @@ Salesforce Switch is an enterprise-grade web application that allows Salesforce 
 |-------------|-----|
 | **Frontend (Vercel)** | [https://vandana-assignment.vercel.app](https://vandana-assignment.vercel.app) |
 | **Backend API (Render)** | [https://cloud-vandana-assignment.onrender.com](https://cloud-vandana-assignment.onrender.com) |
-| **Health Check** | [https://cloud-vandana-assignment.onrender.com/api/health](https://cloud-vandana-assignment.onrender.com/api/health) |
 
 ## 📸 Screenshots
 
