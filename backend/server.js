@@ -6,7 +6,7 @@ const crypto = require('crypto');
 
 const app = express();
 
-// Helper function to clean URLs (remove trailing slashes)
+// Helper function to clean URLs
 const cleanUrl = (url) => url ? url.replace(/\/$/, '') : url;
 
 // Get and clean environment variables
@@ -15,23 +15,19 @@ const allowedOrigins = rawOrigins.map(origin => cleanUrl(origin));
 const frontendUrl = cleanUrl(process.env.FRONTEND_URL) || 'https://vandana-assignment.vercel.app';
 const backendUrl = cleanUrl(process.env.BACKEND_URL) || 'https://cloud-vandana-assignment.onrender.com';
 
-console.log('✅ Cleaned CORS Origins:', allowedOrigins);
-console.log('✅ Cleaned Frontend URL:', frontendUrl);
-console.log('✅ Cleaned Backend URL:', backendUrl);
+console.log('✅ Allowed CORS Origins:', allowedOrigins);
+console.log('✅ Frontend URL:', frontendUrl);
+console.log('✅ Backend URL:', backendUrl);
 
-// ==================== CORS CONFIGURATION ====================
+// ==================== CORS ====================
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin
     if (!origin) return callback(null, true);
-    
-    const cleanOrigin = cleanUrl(origin);
-    
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(cleanOrigin)) {
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(cleanUrl(origin))) {
       callback(null, true);
     } else {
       console.log('❌ Blocked origin:', origin);
-      callback(null, true); // Temporarily allow for debugging
+      callback(null, true); // Allow anyway for debugging
     }
   },
   credentials: true,
@@ -40,36 +36,54 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie']
 }));
 
-// ==================== OTHER MIDDLEWARE ====================
 app.use(express.json());
 app.set('trust proxy', 1);
 
-// ==================== SESSION CONFIGURATION ====================
+// ==================== SESSION (Simplified) ====================
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { 
-    secure: true,        // Must be true for HTTPS (Render serves over HTTPS)
+  cookie: {
+    secure: false,  // Set to false for Render
     httpOnly: true,
-    sameSite: 'none',    // Required for cross-origin (Vercel -> Render)
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
+// In-memory storage for OAuth states (bypass session issue)
+const stateStore = new Map();
+
+// Clean up old states every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of stateStore.entries()) {
+    if (now - value.timestamp > 10 * 60 * 1000) {
+      stateStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// Global token storage (for demo)
 let globalAccessToken = null;
 let globalInstanceUrl = null;
 let cachedRules = [];
 
-// ==================== OAuth 2.0 LOGIN ====================
+// ==================== OAuth ROUTES ====================
+
+// Login - Generate OAuth URL
 app.get('/auth/login', (req, res) => {
-  const redirectUri = `${backendUrl}/oauth/callback`;
   const state = crypto.randomBytes(16).toString('hex');
-  req.session.oauthState = state;
+  const redirectUri = `${backendUrl}/oauth/callback`;
   
-  console.log('\n🔐 OAuth Login URL generated');
-  console.log('🔐 State stored in session:', state);
-  console.log('🔐 Session ID:', req.session.id);
+  // Store state in memory (not session)
+  stateStore.set(state, {
+    timestamp: Date.now(),
+    used: false
+  });
+  
+  console.log('🔐 Generated state:', state);
   console.log('🔐 Redirect URI:', redirectUri);
   
   const loginUrl = `https://login.salesforce.com/services/oauth2/authorize?` +
@@ -82,33 +96,33 @@ app.get('/auth/login', (req, res) => {
   res.json({ url: loginUrl });
 });
 
-// OAuth Callback
+// Callback - Exchange code for token
 app.get('/oauth/callback', async (req, res) => {
   const { code, state } = req.query;
   
-  console.log('\n📞 OAuth Callback received');
-  console.log('📞 State from query:', state);
-  console.log('📞 Session ID:', req.session?.id);
-  console.log('📞 Session oauthState:', req.session?.oauthState);
+  console.log('📞 Callback received');
+  console.log('📞 State:', state);
+  console.log('📞 Code exists:', !!code);
   
-  // Check session
-  if (!req.session) {
-    console.error('❌ No session found');
-    return res.status(400).send('No session found');
-  }
-  
-  // Validate state parameter
-  if (state !== req.session.oauthState) {
-    console.error('❌ Invalid state parameter');
-    console.error('Expected:', req.session.oauthState);
-    console.error('Received:', state);
+  // Verify state
+  const storedState = stateStore.get(state);
+  if (!storedState) {
+    console.error('❌ Invalid state');
     return res.status(400).send('Invalid state parameter');
   }
   
-  if (!code) {
-    console.error('❌ No authorization code received');
-    return res.status(400).send('No authorization code received');
+  if (storedState.used) {
+    console.error('❌ State already used');
+    return res.status(400).send('State already used');
   }
+  
+  if (!code) {
+    console.error('❌ No code received');
+    return res.status(400).send('No authorization code');
+  }
+  
+  // Mark state as used
+  stateStore.set(state, { ...storedState, used: true });
   
   try {
     const redirectUri = `${backendUrl}/oauth/callback`;
@@ -127,23 +141,22 @@ app.get('/oauth/callback', async (req, res) => {
       body: params
     });
     
-    const tokenData = await response.json();
+    const data = await response.json();
     
-    if (tokenData.error) {
-      console.error('❌ Token error:', tokenData);
-      throw new Error(tokenData.error_description);
+    if (data.error) {
+      throw new Error(data.error_description);
     }
     
-    req.session.accessToken = tokenData.access_token;
-    req.session.instanceUrl = tokenData.instance_url;
-    req.session.userId = tokenData.id;
+    // Store tokens globally
+    globalAccessToken = data.access_token;
+    globalInstanceUrl = data.instance_url;
     
-    globalAccessToken = tokenData.access_token;
-    globalInstanceUrl = tokenData.instance_url;
+    console.log('✅ OAuth successful!');
     
-    console.log('✅ OAuth Login successful!');
-    console.log('✅ User ID:', tokenData.id);
+    // Clean up state
+    stateStore.delete(state);
     
+    // Redirect to frontend dashboard
     res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
     console.error('❌ OAuth error:', error);
@@ -151,41 +164,32 @@ app.get('/oauth/callback', async (req, res) => {
   }
 });
 
-// ==================== VALIDATION RULES ENDPOINTS ====================
+// ==================== API ROUTES ====================
 
-// Get all validation rules
+// Get validation rules
 app.get('/api/validation-rules', async (req, res) => {
-  const token = req.session?.accessToken || globalAccessToken;
-  const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
-  
-  console.log('\n📊 Fetching validation rules...');
-  
-  if (!token) {
+  if (!globalAccessToken) {
     return res.status(401).json({ error: 'Not logged in' });
   }
   
   try {
-    const idQuery = encodeURIComponent("SELECT Id FROM ValidationRule");
-    const idResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/query?q=${idQuery}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+    const query = encodeURIComponent("SELECT Id FROM ValidationRule");
+    const response = await fetch(`${globalInstanceUrl}/services/data/v58.0/tooling/query?q=${query}`, {
+      headers: { 'Authorization': `Bearer ${globalAccessToken}` }
     });
     
-    const idData = await idResponse.json();
+    const data = await response.json();
     
-    if (!idData.records || idData.records.length === 0) {
-      console.log('No validation rules found');
+    if (!data.records || data.records.length === 0) {
       return res.json([]);
     }
     
-    console.log(`Found ${idData.records.length} rule IDs`);
-    
     const rules = [];
-    for (const record of idData.records) {
-      const ruleResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${record.Id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+    for (const record of data.records) {
+      const ruleRes = await fetch(`${globalInstanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${record.Id}`, {
+        headers: { 'Authorization': `Bearer ${globalAccessToken}` }
       });
-      
-      const ruleData = await ruleResponse.json();
+      const ruleData = await ruleRes.json();
       
       let cleanName = ruleData.FullName;
       if (cleanName.includes('.')) {
@@ -201,162 +205,98 @@ app.get('/api/validation-rules', async (req, res) => {
     }
     
     cachedRules = rules;
-    
-    console.log(`✅ Retrieved ${rules.length} validation rules`);
-    rules.forEach(r => console.log(`  - ${r.name}: ${r.active ? '🟢 Active' : '🔴 Inactive'}`));
-    
+    console.log(`✅ Returning ${rules.length} rules`);
     res.json(rules);
-    
   } catch (error) {
-    console.error('❌ Error fetching rules:', error.message);
+    console.error('Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update validation rule
+// Update rule
 app.post('/api/update-rule', async (req, res) => {
   const { ruleName, active } = req.body;
-  const token = req.session?.accessToken || globalAccessToken;
-  const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
   
-  console.log(`\n📝 Updating rule: "${ruleName}" → ${active ? '🟢 Active' : '🔴 Inactive'}`);
-  
-  if (!token) {
+  if (!globalAccessToken) {
     return res.status(401).json({ error: 'Not logged in' });
   }
   
   try {
     const rule = cachedRules.find(r => r.name === ruleName);
-    
     if (!rule) {
-      console.log(`❌ Rule "${ruleName}" not found`);
-      return res.json({ success: false, error: 'Rule not found' });
+      return res.json({ success: false });
     }
     
-    console.log(`Found rule: ${rule.fullName} (ID: ${rule.id})`);
-    
-    const getResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.id}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    const ruleData = await getResponse.json();
-    const currentMetadata = ruleData.Metadata || {};
-    
-    const updateMetadata = {
-      active: active,
-      errorConditionFormula: currentMetadata.errorConditionFormula || 'true',
-      errorMessage: currentMetadata.errorMessage || 'Validation Error',
-      description: currentMetadata.description || ''
-    };
-    
-    const updateResponse = await fetch(`${instanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.id}`, {
+    const updateRes = await fetch(`${globalInstanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.id}`, {
       method: 'PATCH',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${globalAccessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        Metadata: updateMetadata
+        Metadata: { active: active }
       })
     });
     
-    if (updateResponse.ok) {
-      console.log(`✅ Successfully updated "${ruleName}"`);
+    if (updateRes.ok) {
       rule.active = active;
+      console.log(`✅ Updated ${ruleName}`);
       res.json({ success: true });
     } else {
-      const errorText = await updateResponse.text();
-      console.log(`❌ Update failed: ${errorText}`);
       res.json({ success: false });
     }
-    
   } catch (error) {
-    console.error('❌ Update error:', error.message);
     res.json({ success: false });
   }
 });
 
-// ==================== UTILITY ENDPOINTS ====================
-
-// Check authentication status
-app.get('/api/auth/status', (req, res) => {
-  const token = req.session?.accessToken || globalAccessToken;
-  res.json({ 
-    isLoggedIn: !!token
-  });
-});
-
-// Get current user info from Salesforce
+// Get user info
 app.get('/api/user/info', async (req, res) => {
-  const token = req.session?.accessToken || globalAccessToken;
-  const instanceUrl = req.session?.instanceUrl || globalInstanceUrl;
-  
-  console.log('\n👤 Fetching user info from Salesforce...');
-  
-  if (!token) {
+  if (!globalAccessToken) {
     return res.status(401).json({ error: 'Not logged in' });
   }
   
   try {
-    const response = await fetch(`${instanceUrl}/services/oauth2/userinfo`, {
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+    const response = await fetch(`${globalInstanceUrl}/services/oauth2/userinfo`, {
+      headers: { 'Authorization': `Bearer ${globalAccessToken}` }
     });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
     const userInfo = await response.json();
     
     res.json({
       success: true,
       user: {
-        username: userInfo.username || 'unknown',
-        name: userInfo.name || 'Salesforce User',
-        email: userInfo.email || userInfo.username,
-        userId: userInfo.user_id,
-        orgId: userInfo.organization_id,
-        orgName: userInfo.organization_name || 'Salesforce Org',
-        instanceUrl: instanceUrl
+        username: userInfo.username,
+        name: userInfo.name,
+        email: userInfo.email,
+        orgName: userInfo.organization_name || 'Salesforce Org'
       }
     });
   } catch (error) {
-    console.error('❌ Error fetching user info:', error.message);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false });
   }
+});
+
+// Auth status
+app.get('/api/auth/status', (req, res) => {
+  res.json({ isLoggedIn: !!globalAccessToken });
 });
 
 // Logout
 app.get('/auth/logout', (req, res) => {
-  req.session.destroy();
   globalAccessToken = null;
   globalInstanceUrl = null;
   cachedRules = [];
-  console.log('👋 User logged out');
   res.json({ success: true });
 });
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
 // ==================== START SERVER ====================
-
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log('\n🚀 =====================================');
-  console.log('✨ Salesforce Switch Backend Server');
-  console.log('=====================================');
-  console.log(`📡 Server: ${backendUrl}`);
-  console.log(`🔐 OAuth Login: ${backendUrl}/auth/login`);
-  console.log(`💚 Health: ${backendUrl}/api/health`);
-  console.log('=====================================\n');
+  console.log(`\n🚀 Backend running on port ${PORT}`);
+  console.log(`📡 Health: ${backendUrl}/api/health\n`);
 });
