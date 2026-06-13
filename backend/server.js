@@ -40,14 +40,11 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie']
 }));
 
-// Handle preflight requests
-app.options('*', cors());
-
 // ==================== OTHER MIDDLEWARE ====================
 app.use(express.json());
 app.set('trust proxy', 1);
 
-// ==================== SESSION CONFIGURATION (FIXED) ====================
+// ==================== SESSION CONFIGURATION ====================
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
