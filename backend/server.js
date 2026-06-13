@@ -27,7 +27,7 @@ app.use(cors({
       callback(null, true);
     } else {
       console.log('❌ Blocked origin:', origin);
-      callback(null, true); // Allow anyway for debugging
+      callback(null, true);
     }
   },
   credentials: true,
@@ -39,20 +39,20 @@ app.use(cors({
 app.use(express.json());
 app.set('trust proxy', 1);
 
-// ==================== SESSION (Simplified) ====================
+// Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,  // Set to false for Render
+    secure: false,
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
-// In-memory storage for OAuth states (bypass session issue)
+// In-memory storage for OAuth states
 const stateStore = new Map();
 
 // Clean up old states every 5 minutes
@@ -65,26 +65,21 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Global token storage (for demo)
+// Global token storage
 let globalAccessToken = null;
 let globalInstanceUrl = null;
 let cachedRules = [];
 
 // ==================== OAuth ROUTES ====================
 
-// Login - Generate OAuth URL
 app.get('/auth/login', (req, res) => {
   const state = crypto.randomBytes(16).toString('hex');
   const redirectUri = `${backendUrl}/oauth/callback`;
   
-  // Store state in memory (not session)
   stateStore.set(state, {
     timestamp: Date.now(),
     used: false
   });
-  
-  console.log('🔐 Generated state:', state);
-  console.log('🔐 Redirect URI:', redirectUri);
   
   const loginUrl = `https://login.salesforce.com/services/oauth2/authorize?` +
     `response_type=code&` +
@@ -96,32 +91,18 @@ app.get('/auth/login', (req, res) => {
   res.json({ url: loginUrl });
 });
 
-// Callback - Exchange code for token
 app.get('/oauth/callback', async (req, res) => {
   const { code, state } = req.query;
   
-  console.log('📞 Callback received');
-  console.log('📞 State:', state);
-  console.log('📞 Code exists:', !!code);
-  
-  // Verify state
   const storedState = stateStore.get(state);
-  if (!storedState) {
-    console.error('❌ Invalid state');
+  if (!storedState || storedState.used) {
     return res.status(400).send('Invalid state parameter');
   }
   
-  if (storedState.used) {
-    console.error('❌ State already used');
-    return res.status(400).send('State already used');
-  }
-  
   if (!code) {
-    console.error('❌ No code received');
     return res.status(400).send('No authorization code');
   }
   
-  // Mark state as used
   stateStore.set(state, { ...storedState, used: true });
   
   try {
@@ -132,8 +113,6 @@ app.get('/oauth/callback', async (req, res) => {
     params.append('client_id', process.env.CLIENT_ID);
     params.append('client_secret', process.env.CLIENT_SECRET);
     params.append('redirect_uri', redirectUri);
-    
-    console.log('🔄 Exchanging code for token...');
     
     const response = await fetch('https://login.salesforce.com/services/oauth2/token', {
       method: 'POST',
@@ -147,26 +126,18 @@ app.get('/oauth/callback', async (req, res) => {
       throw new Error(data.error_description);
     }
     
-    // Store tokens globally
     globalAccessToken = data.access_token;
     globalInstanceUrl = data.instance_url;
     
-    console.log('✅ OAuth successful!');
-    
-    // Clean up state
     stateStore.delete(state);
-    
-    // Redirect to frontend dashboard
     res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
-    console.error('❌ OAuth error:', error);
     res.status(500).send('OAuth failed: ' + error.message);
   }
 });
 
 // ==================== API ROUTES ====================
 
-// Get validation rules
 app.get('/api/validation-rules', async (req, res) => {
   if (!globalAccessToken) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -205,15 +176,12 @@ app.get('/api/validation-rules', async (req, res) => {
     }
     
     cachedRules = rules;
-    console.log(`✅ Returning ${rules.length} rules`);
     res.json(rules);
   } catch (error) {
-    console.error('Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update rule
 app.post('/api/update-rule', async (req, res) => {
   const { ruleName, active } = req.body;
   
@@ -227,6 +195,14 @@ app.post('/api/update-rule', async (req, res) => {
       return res.json({ success: false });
     }
     
+    // Get the full rule metadata first
+    const getRes = await fetch(`${globalInstanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.id}`, {
+      headers: { 'Authorization': `Bearer ${globalAccessToken}` }
+    });
+    const ruleData = await getRes.json();
+    const currentMetadata = ruleData.Metadata || {};
+    
+    // Update with complete metadata
     const updateRes = await fetch(`${globalInstanceUrl}/services/data/v58.0/tooling/sobjects/ValidationRule/${rule.id}`, {
       method: 'PATCH',
       headers: {
@@ -234,13 +210,17 @@ app.post('/api/update-rule', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        Metadata: { active: active }
+        Metadata: {
+          active: active,
+          errorConditionFormula: currentMetadata.errorConditionFormula || 'true',
+          errorMessage: currentMetadata.errorMessage || 'Validation Error',
+          description: currentMetadata.description || ''
+        }
       })
     });
     
     if (updateRes.ok) {
       rule.active = active;
-      console.log(`✅ Updated ${ruleName}`);
       res.json({ success: true });
     } else {
       res.json({ success: false });
@@ -250,7 +230,6 @@ app.post('/api/update-rule', async (req, res) => {
   }
 });
 
-// Get user info
 app.get('/api/user/info', async (req, res) => {
   if (!globalAccessToken) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -276,12 +255,10 @@ app.get('/api/user/info', async (req, res) => {
   }
 });
 
-// Auth status
 app.get('/api/auth/status', (req, res) => {
   res.json({ isLoggedIn: !!globalAccessToken });
 });
 
-// Logout
 app.get('/auth/logout', (req, res) => {
   globalAccessToken = null;
   globalInstanceUrl = null;
@@ -289,7 +266,6 @@ app.get('/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
